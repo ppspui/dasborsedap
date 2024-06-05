@@ -1,0 +1,564 @@
+
+
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+                <link href='https://fonts.googleapis.com/css?family=Roboto:400,700,100,900' rel='stylesheet' type='text/css'>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+        <link rel="icon" href="https://static.statuscake.com/img/logos/favicon.ico" type="image/x-icon"/>
+              <link href='https://ppspui.github.io/dasborsedap/uptimes/statuscake.css' rel='stylesheet' type='text/css'>
+        <title>StatusCake Public Report</title>
+        <link href='https://app.statuscake.com/Workfloor/PublicReportCSS.php?PublicID=RSXy0Zy53S' rel='stylesheet' type='text/css'>
+        <link rel="stylesheet" href='https://cdn.datatables.net/1.12.1/css/jquery.dataTables.min.css' />
+    </head>
+    <!-- 2021 -->
+
+    <body>
+
+    <div id="content-header" class="blur">
+        <header id="header" onclick="ViewHome()" style="cursor:pointer;" class="visible">
+            <h1><span class="MainTitle">Loading...</span></h1>
+        </header>
+    </div>
+
+    <div class="container">
+
+        <div class="row PasswordReq" style="display:none;">
+            <div class="col-md-6 col-md-offset-3">
+                <div class="Box ">
+                    <div class="Title"><h1><i class="fa fa-key"></i> Password</div>
+                    <div class="PassContainer"><input type="password" placeholder="" class="PassBox"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row DetailArea">
+            <div class="col-md-9">
+
+                <div class="Box">
+                    <div class="Title"><h1><i class="fa fa-history"></i> Announcements</div>
+                    <div id="Announce">No current announcements</div>
+                </div>
+
+                <div class="Box">
+                    <div class="Title"><h1><i class="fa fa-history"></i> Uptime History</div>
+                    <div class="table-responsive">
+                        <table id="MainData" class="table table-full table-striped">
+                            <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Name</th>
+                                <th>Rate</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <span class="timezone_indicator">All times reported in the Asia/Jakarta timezone</span>
+                <br><br>
+            </div>
+
+            <div class="col-md-3">
+
+                <div class="Box BlockView" style="display:none;">
+                    <div class="Title"><h1><i class="fa fa-power-off"></i> Powered By</div>
+                    <div id="PoweredBy" style="text-align: center; padding: 10px;">
+                        <a href="https://www.statuscake.com">
+                            <img src="https://static.statuscake.com/img/logos/horizontal-logo-blackberry-text.png" width="200px" />
+                        </a>
+                        <br>
+                        <br>
+                        <a href="https://www.statuscake.com" style="font-weight: bold;"><i class="fa fa-plus"></i> Create a Free Account Now</a>
+                    </div>
+                </div>
+
+                <div class="Box Twitter" style="display:none;">
+                    <div class="Title"><h1><i class="fa fa-twitter"></i> Recent Tweets</div>
+                    <div id="Tweets"></div>
+                </div>
+
+                <div class="Box">
+                    <div class="Title"><h1><i class="fa fa-rocket"></i> 7 Day Uptime</div>
+                    <div id="7Day"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    </body>
+
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js" type="text/javascript"></script>
+    <script type="text/javascript" src="./highstock_.js"></script>
+    <script src="./generatemap.js" type="text/javascript"></script>
+    <script src="./jquery-jvectormap-1.1.1.min.js" type="text/javascript"></script>
+    <script src="./jquery-jvectormap-world-mill-en.js" type="text/javascript"></script>
+    <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+    <script src='https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js' type="text/javascript"></script>
+
+    <script type="text/javascript">
+
+        var Title = '';
+        var MasterTestID = 0;
+        var SetPassword = '';
+
+        !function (d, s, id) {
+            var js, fjs = d.getElementsByTagName(s)[0];
+            if (!d.getElementById(id)) {
+                js = d.createElement(s);
+                js.id = id;
+                js.src = "https://platform.twitter.com/widgets.js";
+                fjs.parentNode.insertBefore(js, fjs);
+            }
+        }(document, "script", "twitter-wjs");
+
+
+
+
+                var PublicID = 'RSXy0Zy53S';
+        
+
+
+        function UptimeToIcons(Uptime) {
+            var Icon = 'Green';
+            var Uptime = parseFloat(Uptime);
+            if (Uptime == 100) {
+                Icon = 'Green';
+            } else if (Uptime < 100 && Uptime > 98) {
+                Icon = 'Yellow';
+            } else if (Uptime <= 98) {
+                Icon = 'Red';
+            }
+            return '<div style="text-align:center;" title="' + Uptime + '" class="Uptime"><div class="Blob Blob_' + Icon + '"></div></div>';
+        }
+
+        function isNumeric(n) {
+            return !isNaN(parseFloat(n)) && isFinite(n);
+        }
+
+        function UptimeData() {
+            var Count = 0;
+            var Total = 0;
+            $(".Uptime").each(function (index) {
+                var Uptime = parseFloat($(this).attr('title'));
+                if (isNumeric(Uptime)) {
+                    Total = Total + Uptime;
+                    Count++
+                }
+            });
+
+            var Uptime = (Math.floor((Total / Count) * 100) / 100).toFixed(2);
+
+            $('#7Day').html('<div class="UptimeNumber">' + Uptime + '%</div>');
+        }
+
+        $(".PassBox").keyup(function (e) {
+            if (e.keyCode == 13) {
+                e.target.disabled = true;
+                SetPassword = e.target.value;
+                Runner();
+            }
+        });
+
+        var selectedStatusPeriod = '';
+
+        $(document).on('click', '#HistoryTable .HolderClass', function (e) {
+            var HolderItem = $(e.target.parentNode);
+
+            var annotations = HolderItem.data('annotations');
+
+            if (!annotations || !parseInt(0)) {
+                return;
+            }
+
+            var currentToggle = HolderItem.data('toggled') == false;
+            HolderItem.data('toggled', currentToggle);
+
+            if (HolderItem.data('toggled')) {
+                for(const [key, value] of Object.entries(annotations)) {
+                    var annotationHTML = $("<tr class='AnnoBlock'><td colspan='5'>" + key + ' : '  + value + "</td></tr>");
+                    annotationHTML.attr('data-period-id', HolderItem.attr('name'));
+                    HolderItem.after(annotationHTML);
+                }
+            } else {
+                $('.AnnoBlock[data-period-id="'+ HolderItem.attr('name') +'"]').remove();
+            }
+        });
+
+        function Period(TestID) {
+            $('#HistoryTable').DataTable({
+                'sPaginationType': 'simple',
+                'pageLength': 20,
+                'lengthChange': false,
+                'order': [],
+                'aoColumnDefs': [
+                    {
+                        'data': 'status',
+                        'aTargets': [0],
+                        'bSortable': false,
+                    },
+                    {
+                        'data': 'from',
+                        'aTargets': [1],
+                        'bSortable': false,
+                    },
+                    {
+                        'data': 'until',
+                        'aTargets': [2],
+                        'bSortable': false,
+                    },
+                    {
+                        'data': 'span',
+                        'aTargets': [3],
+                        'bSortable': false,
+                    },
+                ],
+                'sorting': [[1, 'desc']],
+                'sDom': '<"">rt<"F"lp>',
+                'serverSide': true,
+                'ajax': {
+                    url: 'https://app.statuscake.com/Workfloor/GetStatusPeriods.php',
+                    data: {
+                        public_reporting: true,
+                        public_id: PublicID,
+                        TestID: TestID,
+                    },
+                },
+                'createdRow': function (row, data, index) {
+                    $(row).addClass('HolderClass');
+                    $(row).attr('name', 'P_' + data.id);
+                    if (data.annotations) {
+                        $(row).attr('data-annotations', JSON.stringify(data.annotations));
+                        $(row).attr('data-toggled', false);
+                    }
+                },
+            });
+        }
+
+        function ViewSingle(TestID) {
+            $("#HistoryTable > tbody").html("");
+            $('#map').empty();
+            MasterTestID = TestID;
+
+            $('#AllData').css("display", "none");
+            $('.showonhome').css("display", "none");
+            $('.showonsingle').css("display", "block");
+            $('#SingleData').css("display", "block");
+            LoadTime(TestID);
+            GenerateMap(TestID);
+            Period(TestID);
+        }
+
+        var LastSelected = 0;
+
+        function ViewSingleExpand(TestID) {
+            $('#DisplayBlock').remove();
+            if (LastSelected != TestID) {
+                LastSelected = TestID;
+
+                $('#row_' + TestID).after(`
+                    <tr id="DisplayBlock" data-DisplayID="' + TestID + '" >
+                        <td style="padding:30px;" colspan="10">
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="panel panel-success">
+                                        <div class="panel-heading">Uptime History</div>
+                                        <div class="panel-bodys">
+                                            <div id="LoadTime" style="height:300px;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row" id="PeriodHistory">
+                                <div class="col-md-12">
+                                    <div class="panel panel-info">
+                                        <div class="panel-heading">Uptime History</div>
+                                        <div class="panel-bodys">
+                                            <table class="table table-sm" width="100%" id="HistoryTable">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Status </th>
+                                                        <th>Start </th>
+                                                        <th>End </th>
+                                                        <th>Length </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                `);
+                ViewSingle(TestID);
+            } else {
+                LastSelected = 0;
+            }
+
+        }
+
+        if (window.location.hash) {
+            var hash = window.location.hash.substring(1); //Puts hash in variable, and removes the # character
+            if (hash.match(/^[0-9a-zA-Z]+$/)) ViewSingle(hash);
+            // hash found
+        } else {
+            // No hash found
+        }
+
+        function ViewHome() {
+            $('#AllData').css("display", "block");
+            $('.showonhome').css("display", "block");
+            $('.showonsingle').css("display", "none");
+            $('#SingleData').css("display", "none");
+        }
+
+
+        function LoadTime() {
+
+            $.getJSON('https://app.statuscake.com/Workfloor/API/influx_public.php?Ref=Public&Type=Chart&TestID=' + MasterTestID + '&All=true&TestType=HTTP&tz=Asia/Jakarta&callback=?', function (data) {
+
+                var dataseries = [];
+                var dataitems = [];
+                for (var key in data) {
+                    dataitems.push({"x": data[key][0], "y": data[key][1], "color": data[key]['color']});
+                }
+                dataseries.push({
+                    name: 'All Data',
+                    type: 'area',
+                    data: dataitems,
+                    threshold: null,
+                    visible: true,
+                    step: false,
+                    dataGrouping: {enabled: false},
+                    shadow: false,
+                    tooltip: {valueDecimals: 2}
+                });
+
+                // Create the chart
+                window.chart = new Highcharts.StockChart({
+                    chart: {
+                        backgroundColor: null,
+                        plotBackgroundColor: "rgba(255, 255, 255, 1)",
+                        plotBorderWidth: 1,
+                        plotBorderColor: "#d2d2d2",
+                        renderTo: 'LoadTime'
+                    },
+
+                    yAxis: {
+                        labels: {
+                            formatter: function () {
+                                return this.value + "s";
+                            },
+                            style: {
+                                color: "#000",
+                                textShadow: "0 1px 2px #EEEEEE",
+                            }
+                        },
+                        min: -0
+                    },
+
+                    navigator: {
+                        enabled: true,
+                        adaptToUpdatedData: false,
+                    },
+
+                    scrollbar: {
+                        liveRedraw: false
+                    },
+
+                    legend: {
+                        layout: 'vertical',
+                        align: 'right',
+                        verticalAlign: 'middle',
+                        borderWidth: 0,
+                        enabled: false
+                    },
+
+                    rangeSelector: {
+                        selected: 2,
+                        enabled: true,
+                        buttons: [{
+                            type: 'hour',
+                            count: 1,
+                            text: '1h'
+                        }, {
+                            type: 'hour',
+                            count: 12,
+                            text: '12h'
+                        }, {
+                            type: 'day',
+                            count: 1,
+                            text: '1d'
+                        }, {
+                            type: 'week',
+                            count: 1,
+                            text: '1w'
+                        }, {
+                            type: 'day',
+                            count: 30,
+                            text: '1m'
+                        }]
+                    },
+
+                    plotOptions: {
+                        series: {
+                            turboThreshold: 10000
+                        }
+                    },
+
+                    xAxis: {
+
+                        minRange: 3600 // one hour
+                    },
+
+
+                    credits: {
+                        enabled: false
+                    },
+
+                    title: {
+                        text: ''
+
+                    },
+
+
+                    series: dataseries
+
+                });
+            });
+
+        }
+        ;
+
+
+        var Times = 0;
+
+        function Runner() {
+
+            $.getJSON('https://app.statuscake.com/Workfloor/PublicReportHandler.php?PublicID=' + PublicID + '&SetPassword=' + encodeURIComponent(SetPassword) + '&callback=?', function (data) {
+
+                if (data.Protected == true) {
+                    if (Times > 0) {
+                        var passBox = $('.PassBox');
+                        passBox.css('border', '1px dashed #F37D7D');
+                        passBox.removeAttr('disabled');
+                    }
+                    $('.MainTitle').text('Password Required');
+                    $('.PasswordReq').css('display', 'block');
+                    $('.PassBox').focus();
+                    $('.DetailArea').css('display', 'none');
+                    Times++;
+                } else {
+                    $('.PasswordReq').css('display', 'none');
+                    $('.DetailArea').css('display', 'block');
+
+                    // Set the custom background image
+                    if (data.BG) {
+                        $('body').css('background-color', data.BG);
+                    }
+                    if (data.HeadBG) {
+                        $('#content-header').css('background-color', data.HeadBG);
+                    }
+                    if (data.BlockHead) {
+                        $('.MainTitle').css('color', data.BlockHead);
+                    }
+                    if (data.Announce) {
+                        $('#Announce').html(data.Announce);
+                    }
+                    // Set Google Analytics Code
+                    if (data.GA) {
+
+                    }
+
+
+                    if (data.Skin) {
+                        $("#Skin").attr("href", "css/" + data.Skin + ".css");
+                    }
+
+                    $('.MainTitle').html(data.Title);
+                    Title = data.Title
+                    document.title = Title.replace(/\\/gi, '');
+
+                    if (data.LogoImage) {
+                        $('.MainTitle').html("<img src='" + data.LogoImage + "' />");
+                        $('#header').css("padding", "12px");
+                    }
+
+                    if (data.ShowAd === true) {
+                        $('.BlockView').css("display", "block");
+                    }
+
+                    // Setup the date headers
+                    $.each(data.Dates, function (key, val) {
+                        $('#MainData thead tr').append('<th class="AlignCentre">' + val + '</th>');
+                    });
+
+                    if (data.Twitter) {
+
+                        $('#Tweets').html('<a class="twitter-timeline" data-height="500" href="https://twitter.com/' + data.Twitter + '">Tweets by TwitterDev</a>');
+
+                        if (typeof (twttr) != "undefined") {
+                            twttr.widgets.load();
+                            $('.twitter-timeline').css("width", "100%");
+                            $('.Twitter').css("display", "block");
+                            $('#Tweets').css("display", "block");
+                        }
+                    }
+                    $.each(data.TestData, function (key, val) {
+
+                        // alert(val.Uptime);
+                        // Each Test Date
+                        var Status = '';
+
+                        if (val.Status == 'Up') {
+                            Status = '<i class="fa fa-arrow-circle-up statusicon up"></i>';
+                        } else {
+                            Status = '<i class="fa fa-arrow-circle-down statusicon down"></i>';
+                        }
+
+                        var CheckMinutes = parseInt(val.CheckRate) / 60;
+                        var Row = '<tr id="row_' + val.TestID + '" class="Clickable" onclick="ViewSingleExpand(' + val.TestID + ')"><td>' + Status + '</td><td>' + val.Name + '</td><td>' + CheckMinutes + '<span class="subtext">m</span></td>';
+
+                        $.each(val.Uptime, function (key, val) {
+                            if (val != 'N/A') {
+
+                                if (data.Orbs == 1) {
+                                    var UptimeHTML = UptimeToIcons(val);
+                                } else {
+                                    var UptimeHTML = '<span class="Uptime" title="' + val + '">' + val + '%</span>';
+                                }
+
+                                Row += '<td class="AlignCentre">' + UptimeHTML + '</td>';
+                            } else {
+                                Row += '<td class="AlignCentre"><span class=" Uptime" title="' + val + '"><span class="subtext"></span></td>';
+                            }
+                        });
+
+                        $('#MainData tbody').append(Row + '</tr>');
+
+                        UptimeData();
+
+                        if (data.Orbs == 1) {
+                            UptimeToIcons();
+                        }
+                    });
+                }
+
+            });
+        }
+
+        Runner();
+    </script>
+
+    
+    
+    </html>
