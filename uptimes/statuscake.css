@@ -15,6 +15,9 @@ html {
 body {
   margin: 0; }
 
+/* custom danial */
+table#MainData tr#DisplayBlock td div.row:nth-child(1) { display: none; }
+
 article,
 aside,
 details,
