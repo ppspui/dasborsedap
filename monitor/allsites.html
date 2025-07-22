@@ -71,7 +71,7 @@
         const deprecatedGrid = document.getElementById('iframe-grid-deprecated');
         
         const IFRAME_WIDTH = 1280;
-        const IFRAME_HEIGHT = 960; // Tinggi asli iframe tetap dipertahankan
+        const IFRAME_HEIGHT = 960; // Rasio 4:3
 
         // Fungsi untuk membuat HTML widget
         function createWidgetHTML(service) {
@@ -80,11 +80,17 @@
                     <div class="p-4 border-b border-gray-200 dark:border-gray-700">
                         <h2 class="font-bold text-gray-800 dark:text-white truncate">${service.name}</h2>
                     </div>
-                    <!-- Kontainer ini sekarang memiliki tinggi tetap dan scrollbar vertikal yang dipaksa muncul -->
-                    <div class="iframe-container" style="height: 300px; overflow-y: scroll; overflow-x: hidden;">
+                    <!-- Kontainer ini akan memiliki tinggi dinamis untuk rasio 4:3 -->
+                    <div class="iframe-container relative overflow-hidden">
+                        <!-- Lapisan transparan untuk menangkap klik -->
+                        <div 
+                            class="absolute top-0 left-0 w-full h-full z-10 cursor-pointer"
+                            onclick="window.open('${service.url}', '_blank');"
+                            title="Buka ${service.name} di tab baru">
+                        </div>
                         <iframe 
                             src="${service.url}" 
-                            class="scalable-iframe" 
+                            class="scalable-iframe absolute top-0 left-0" 
                             frameborder="0" 
                             scrolling="no"
                             style="width: ${IFRAME_WIDTH}px; height: ${IFRAME_HEIGHT}px; transform-origin: 0 0; border: 0;"
@@ -114,15 +120,15 @@
                 const iframe = container.querySelector('.scalable-iframe');
                 if (!iframe) return;
 
-                // Menyesuaikan lebar kontainer untuk memperhitungkan kemungkinan lebar scrollbar
                 const containerWidth = container.clientWidth;
                 const scale = containerWidth / IFRAME_WIDTH;
 
                 // Terapkan transformasi skala ke iframe
                 iframe.style.transform = 'scale(' + scale + ')';
 
-                // PENTING: Baris yang mengatur tinggi kontainer secara dinamis telah dihapus
-                // untuk memungkinkan scrolling pada kontainer induk.
+                // Atur tinggi kontainer agar sesuai dengan tinggi iframe yang diskalakan,
+                // sehingga mempertahankan rasio aspek 4:3 untuk seluruh widget.
+                container.style.height = (IFRAME_HEIGHT * scale) + 'px';
             });
         }
 
