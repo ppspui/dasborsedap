@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dasbor Layanan UI (Iframe Scaled)</title>
+    <!-- Memuat Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Memuat Font Inter dari Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Menggunakan font Inter sebagai default */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- Header Halaman -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-white">
+                Dasbor Layanan (Tampilan Iframe)
+            </h1>
+            <p class="text-md text-gray-600 dark:text-gray-400 mt-2">
+                Menampilkan layanan Universitas Indonesia dalam widget iframe yang diskalakan.
+            </p>
+        </header>
+
+        <!-- Bagian untuk Layanan Aktif -->
+        <section class="mb-12">
+            <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4 border-b pb-2 border-gray-300 dark:border-gray-600">Layanan Aktif</h2>
+            <main id="iframe-grid-active" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Widget Aktif akan dimasukkan di sini -->
+            </main>
+        </section>
+
+        <!-- Bagian untuk Situs Deprecated -->
+        <section>
+            <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4 border-b pb-2 border-gray-300 dark:border-gray-600">Situs Deprecated</h2>
+            <main id="iframe-grid-deprecated" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Widget Deprecated akan dimasukkan di sini -->
+            </main>
+        </section>
+        
+        <!-- Footer / Catatan -->
+        <footer class="text-center mt-10 text-sm text-gray-500 dark:text-gray-400">
+            <p><strong>Catatan:</strong> Beberapa situs mungkin tidak dapat ditampilkan karena kebijakan keamanan ('X-Frame-Options' atau 'Content-Security-Policy') yang mencegah penyematan (embedding).</p>
+        </footer>
+    </div>
+
+    <script>
+        // Data untuk setiap layanan dengan kategori
+        const servicesToEmbed = [
+            { name: 'dppd.ui.ac.id', url: 'https://dppd.ui.ac.id', category: 'active' },
+            { name: 'emas.ui.ac.id', url: 'https://emas.ui.ac.id', category: 'deprecated' },
+            { name: 'emas2.ui.ac.id', url: 'https://emas2.ui.ac.id', category: 'active' },
+            { name: 'emas3.ui.ac.id', url: 'https://emas3.ui.ac.id', category: 'active' },
+            { name: 'idols.ui.ac.id', url: 'https://idols.ui.ac.id', category: 'active' },
+            { name: 'idols2.ui.ac.id', url: 'https://idols2.ui.ac.id', category: 'active' },
+            { name: 'ocw.ui.ac.id', url: 'https://ocw.ui.ac.id', category: 'active' },
+            { name: 'ovis.ui.ac.id', url: 'https://ovis.ui.ac.id', category: 'active' },
+            { name: 'pjj.ui.ac.id', url: 'https://pjj.ui.ac.id', category: 'active' },
+            { name: 'scele.ui.ac.id', url: 'https://scele.ui.ac.id', category: 'deprecated' }
+        ];
+
+        const activeGrid = document.getElementById('iframe-grid-active');
+        const deprecatedGrid = document.getElementById('iframe-grid-deprecated');
+
+        // Fungsi untuk membuat HTML widget
+        function createWidgetHTML(service) {
+            return `
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col">
+                    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                        <h2 class="font-bold text-gray-800 dark:text-white truncate">${service.name}</h2>
+                    </div>
+                    <div class="iframe-container flex-grow overflow-hidden relative">
+                        <iframe 
+                            src="${service.url}" 
+                            class="scalable-iframe" 
+                            frameborder="0" 
+                            scrolling="no"
+                            style="width: 1280px; height: 960px; transform-origin: 0 0; border: 0;"
+                            title="Tampilan Sematan untuk ${service.name}">
+                            Browser Anda tidak mendukung iframe.
+                        </iframe>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Memasukkan widget ke grid yang sesuai
+        servicesToEmbed.forEach(service => {
+            const widgetHTML = createWidgetHTML(service);
+            if (service.category === 'deprecated') {
+                deprecatedGrid.innerHTML += widgetHTML;
+            } else {
+                activeGrid.innerHTML += widgetHTML;
+            }
+        });
+
+        // Fungsi untuk menskalakan iframe agar sesuai dengan lebar kontainer
+        function scaleIframes() {
+            const containers = document.querySelectorAll('.iframe-container');
+            const assumedContentWidth = 1280; 
+
+            containers.forEach(container => {
+                const iframe = container.querySelector('.scalable-iframe');
+                if (!iframe) return;
+
+                const containerWidth = container.clientWidth;
+                const scale = containerWidth / assumedContentWidth;
+
+                iframe.style.transform = 'scale(' + scale + ')';
+
+                const originalIframeHeight = parseFloat(iframe.style.height) || 960;
+                container.style.height = (originalIframeHeight * scale) + 'px';
+            });
+        }
+
+        // Panggil fungsi saat halaman pertama kali dimuat dan saat ukuran jendela diubah
+        window.addEventListener('load', scaleIframes);
+        window.addEventListener('resize', scaleIframes);
+
+    </script>
+</body>
+</html>
