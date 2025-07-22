@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Memuat Lucide Icons untuk ikon status -->
+    <script src="https://unpkg.com/lucide-icons"></script>
     <style>
         /* Menggunakan font Inter sebagai default */
         body {
@@ -75,20 +77,22 @@
 
         // Fungsi untuk membuat HTML widget
         function createWidgetHTML(service) {
+            // Membuat ID yang valid untuk elemen
+            const safeId = service.name.replace(/[^a-zA-Z0-9]/g, '-');
             return `
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col">
-                    <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                    <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                         <h2 class="font-bold text-gray-800 dark:text-white truncate">${service.name}</h2>
+                        <span id="icon-${safeId}" class="text-gray-400"><i data-lucide="clock"></i></span>
                     </div>
-                    <!-- Kontainer ini akan memiliki tinggi dinamis untuk rasio 4:3 -->
                     <div class="iframe-container relative overflow-hidden">
-                        <!-- Lapisan transparan untuk menangkap klik -->
                         <div 
                             class="absolute top-0 left-0 w-full h-full z-10 cursor-pointer"
                             onclick="window.open('${service.url}', '_blank');"
                             title="Buka ${service.name} di tab baru">
                         </div>
                         <iframe 
+                            id="iframe-${safeId}"
                             src="${service.url}" 
                             class="scalable-iframe absolute top-0 left-0" 
                             frameborder="0" 
@@ -115,25 +119,71 @@
         // Fungsi untuk menskalakan iframe agar sesuai dengan lebar kontainer
         function scaleIframes() {
             const containers = document.querySelectorAll('.iframe-container');
-
             containers.forEach(container => {
                 const iframe = container.querySelector('.scalable-iframe');
                 if (!iframe) return;
-
                 const containerWidth = container.clientWidth;
                 const scale = containerWidth / IFRAME_WIDTH;
-
-                // Terapkan transformasi skala ke iframe
-                iframe.style.transform = 'scale(' + scale + ')';
-
-                // Atur tinggi kontainer agar sesuai dengan tinggi iframe yang diskalakan,
-                // sehingga mempertahankan rasio aspek 4:3 untuk seluruh widget.
-                container.style.height = (IFRAME_HEIGHT * scale) + 'px';
+                iframe.style.transform = `scale(${scale})`;
+                container.style.height = `${IFRAME_HEIGHT * scale}px`;
             });
         }
 
-        // Panggil fungsi saat halaman pertama kali dimuat dan saat ukuran jendela diubah
-        window.addEventListener('load', scaleIframes);
+        // Fungsi untuk mengatur refresh otomatis secara bertahap
+        function setupAutoRefresh() {
+            const services = document.querySelectorAll('.scalable-iframe');
+            const refreshInterval = 60000; // 60 detik
+            const staggerDelay = 5000; // Jeda 5 detik antar iframe
+
+            services.forEach((iframe, index) => {
+                const safeId = iframe.id.replace('iframe-', '');
+                const iconEl = document.getElementById(`icon-${safeId}`);
+
+                const setIcon = (iconName, classes = 'text-gray-400') => {
+                    if (iconEl) {
+                        iconEl.innerHTML = `<i data-lucide="${iconName}"></i>`;
+                        iconEl.className = classes;
+                        lucide.createIcons();
+                    }
+                };
+
+                setTimeout(() => {
+                    setInterval(() => {
+                        try {
+                            // 1. Set status ke 'refreshing'
+                            setIcon('loader-2', 'text-blue-500 animate-spin');
+
+                            // 2. Refresh iframe
+                            const originalSrc = iframe.src.split('?')[0];
+                            iframe.src = `${originalSrc}?t=${new Date().getTime()}`;
+
+                            // 3. Set status ke 'complete' setelah beberapa saat
+                            setTimeout(() => {
+                                setIcon('check-circle-2', 'text-green-500');
+
+                                // 4. Kembali ke status 'idle' setelah beberapa saat
+                                setTimeout(() => {
+                                    setIcon('clock', 'text-gray-400');
+                                }, 3000); // Tampilkan ikon centang selama 3 detik
+                            }, 2000); // Asumsikan refresh selesai dalam 2 detik
+
+                        } catch (e) {
+                            console.error("Gagal merefresh iframe:", e);
+                            setIcon('alert-triangle', 'text-red-500'); // Tampilkan ikon error jika gagal
+                        }
+                    }, refreshInterval);
+                }, index * staggerDelay);
+            });
+        }
+
+        // Panggil fungsi saat halaman pertama kali dimuat
+        window.addEventListener('load', () => {
+            scaleIframes();
+            lucide.createIcons(); // Render ikon awal
+            setupAutoRefresh();
+        });
+
+        // Panggil fungsi skala lagi saat ukuran jendela diubah
         window.addEventListener('resize', scaleIframes);
 
     </script>
