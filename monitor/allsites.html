@@ -132,8 +132,8 @@
         // Fungsi untuk mengatur refresh otomatis secara bertahap
         function setupAutoRefresh() {
             const services = document.querySelectorAll('.scalable-iframe');
-            const refreshInterval = 60000; // 60 detik
-            const staggerDelay = 5000; // Jeda 5 detik antar iframe
+            const refreshInterval = 10000; // 10 detik (dipercepat untuk demo)
+            const staggerDelay = 2000; // Jeda 2 detik antar iframe
 
             services.forEach((iframe, index) => {
                 const safeId = iframe.id.replace('iframe-', '');
@@ -147,37 +147,50 @@
                     }
                 };
 
-                setTimeout(() => {
-                    setInterval(() => {
-                        try {
-                            // 1. Set status ke 'refreshing'
-                            setIcon('loader-2', 'text-blue-500 animate-spin');
+                const startRefreshCycle = () => {
+                    try {
+                        // 1. Set status ke 'refreshing'
+                        setIcon('loader-2', 'text-blue-500 animate-spin');
 
-                            // 2. Refresh iframe
-                            const originalSrc = iframe.src.split('?')[0];
-                            iframe.src = `${originalSrc}?t=${new Date().getTime()}`;
+                        // 2. Definisikan handler untuk event 'load' iframe
+                        const handleLoad = () => {
+                            // 3. Set status ke 'complete'
+                            setIcon('check-circle-2', 'text-green-500');
 
-                            // 3. Set status ke 'complete' setelah beberapa saat
+                            // 4. Kembali ke status 'idle' setelah beberapa saat
                             setTimeout(() => {
-                                setIcon('check-circle-2', 'text-green-500');
+                                setIcon('clock', 'text-gray-400');
+                            }, 3000); // Tampilkan ikon centang selama 3 detik
+                            
+                            // Hapus event listener agar tidak menumpuk
+                            iframe.removeEventListener('load', handleLoad);
+                        };
 
-                                // 4. Kembali ke status 'idle' setelah beberapa saat
-                                setTimeout(() => {
-                                    setIcon('clock', 'text-gray-400');
-                                }, 3000); // Tampilkan ikon centang selama 3 detik
-                            }, 2000); // Asumsikan refresh selesai dalam 2 detik
+                        // Pasang event listener 'load'
+                        iframe.addEventListener('load', handleLoad);
 
-                        } catch (e) {
-                            console.error("Gagal merefresh iframe:", e);
-                            setIcon('alert-triangle', 'text-red-500'); // Tampilkan ikon error jika gagal
-                        }
-                    }, refreshInterval);
+                        // 5. Refresh iframe dengan menambahkan timestamp
+                        const originalSrc = iframe.src.split('?')[0];
+                        iframe.src = `${originalSrc}?t=${new Date().getTime()}`;
+
+                    } catch (e) {
+                        console.error("Gagal merefresh iframe:", e);
+                        setIcon('alert-triangle', 'text-red-500');
+                    }
+                };
+
+                // Beri jeda awal untuk setiap iframe
+                setTimeout(() => {
+                    // Jalankan siklus refresh pertama kali
+                    startRefreshCycle();
+                    // Atur interval untuk siklus berikutnya
+                    setInterval(startRefreshCycle, refreshInterval);
                 }, index * staggerDelay);
             });
         }
 
-        // Panggil fungsi saat halaman pertama kali dimuat
-        window.addEventListener('load', () => {
+        // Panggil fungsi saat DOM siap (lebih cepat dari 'load')
+        document.addEventListener('DOMContentLoaded', () => {
             scaleIframes();
             lucide.createIcons(); // Render ikon awal
             setupAutoRefresh();
