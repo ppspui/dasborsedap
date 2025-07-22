@@ -33,7 +33,7 @@
         <!-- Bagian untuk Layanan Aktif -->
         <section class="mb-12">
             <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4 border-b pb-2 border-gray-300 dark:border-gray-600">Layanan Aktif</h2>
-            <main id="iframe-grid-active" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <main id="iframe-grid-active" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
                 <!-- Widget Aktif akan dimasukkan di sini -->
             </main>
         </section>
@@ -41,7 +41,7 @@
         <!-- Bagian untuk Situs Deprecated -->
         <section>
             <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4 border-b pb-2 border-gray-300 dark:border-gray-600">Situs Deprecated</h2>
-            <main id="iframe-grid-deprecated" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <main id="iframe-grid-deprecated" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
                 <!-- Widget Deprecated akan dimasukkan di sini -->
             </main>
         </section>
@@ -69,6 +69,9 @@
 
         const activeGrid = document.getElementById('iframe-grid-active');
         const deprecatedGrid = document.getElementById('iframe-grid-deprecated');
+        
+        const IFRAME_WIDTH = 1280;
+        const IFRAME_HEIGHT = 960; // Tinggi asli iframe tetap dipertahankan
 
         // Fungsi untuk membuat HTML widget
         function createWidgetHTML(service) {
@@ -77,13 +80,14 @@
                     <div class="p-4 border-b border-gray-200 dark:border-gray-700">
                         <h2 class="font-bold text-gray-800 dark:text-white truncate">${service.name}</h2>
                     </div>
-                    <div class="iframe-container flex-grow overflow-hidden relative">
+                    <!-- Kontainer ini sekarang memiliki tinggi tetap dan scrollbar vertikal -->
+                    <div class="iframe-container" style="height: 350px; overflow-y: auto;">
                         <iframe 
                             src="${service.url}" 
                             class="scalable-iframe" 
                             frameborder="0" 
                             scrolling="no"
-                            style="width: 1280px; height: 960px; transform-origin: 0 0; border: 0;"
+                            style="width: ${IFRAME_WIDTH}px; height: ${IFRAME_HEIGHT}px; transform-origin: 0 0; border: 0;"
                             title="Tampilan Sematan untuk ${service.name}">
                             Browser Anda tidak mendukung iframe.
                         </iframe>
@@ -105,19 +109,20 @@
         // Fungsi untuk menskalakan iframe agar sesuai dengan lebar kontainer
         function scaleIframes() {
             const containers = document.querySelectorAll('.iframe-container');
-            const assumedContentWidth = 1280; 
 
             containers.forEach(container => {
                 const iframe = container.querySelector('.scalable-iframe');
                 if (!iframe) return;
 
+                // Menyesuaikan lebar kontainer untuk memperhitungkan kemungkinan lebar scrollbar
                 const containerWidth = container.clientWidth;
-                const scale = containerWidth / assumedContentWidth;
+                const scale = containerWidth / IFRAME_WIDTH;
 
+                // Terapkan transformasi skala ke iframe
                 iframe.style.transform = 'scale(' + scale + ')';
 
-                const originalIframeHeight = parseFloat(iframe.style.height) || 960;
-                container.style.height = (originalIframeHeight * scale) + 'px';
+                // PENTING: Baris yang mengatur tinggi kontainer secara dinamis telah dihapus
+                // untuk memungkinkan scrolling pada kontainer induk.
             });
         }
 
