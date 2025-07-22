@@ -80,8 +80,8 @@
                     <div class="p-4 border-b border-gray-200 dark:border-gray-700">
                         <h2 class="font-bold text-gray-800 dark:text-white truncate">${service.name}</h2>
                     </div>
-                    <!-- Kontainer ini sekarang memiliki tinggi tetap dan scrollbar vertikal -->
-                    <div class="iframe-container" style="height: 300px; overflow-y: auto;">
+                    <!-- Kontainer ini sekarang memiliki tinggi tetap dan scrollbar vertikal yang dipaksa muncul -->
+                    <div class="iframe-container" style="height: 300px; overflow-y: scroll; overflow-x: hidden;">
                         <iframe 
                             src="${service.url}" 
                             class="scalable-iframe" 
