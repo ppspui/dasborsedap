@@ -29,8 +29,10 @@
 
     <div class="container mx-auto p-2">
         <!-- Header Halaman -->
-        <header class="text-center mb-4">
-            <!-- Judul dan subjudul telah dihapus -->
+        <header class="text-center my-4 text-gray-600 dark:text-gray-400 text-sm">
+             <p>
+                Auto-refresh dalam: <span id="countdown-timer" class="font-bold">30</span> detik.
+            </p>
         </header>
 
         <!-- Bagian untuk Kategori Layanan -->
@@ -45,8 +47,8 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- DATA INI TELAH DIPERBARUI ---
-            // Daftar domain baru sesuai permintaan Anda.
+            const REFRESH_INTERVAL_SECONDS = 30;
+            
             const servicesToEmbed = [
                 { name: 'emas3.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/https/emas3.ui.ac.id', category: 'layanan' },
                 { name: 'emas2.ui.ac.id', url: 'https://emas2.ui.ac.id', category: 'layanan' },
@@ -114,14 +116,13 @@
                 const startTime = performance.now();
                 let isLoaded = false;
 
-                // Fallback timer jika iframe gagal dimuat
                 const timeout = setTimeout(() => {
                     if (!isLoaded) {
                         loadTimeSpan.textContent = '(gagal)';
                         iframe.classList.remove('loading-effect');
-                        iframe.onload = null; // Hapus event listener
+                        iframe.onload = null; 
                     }
-                }, 30000); // 30 detik timeout (DIPERPANJANG DARI 15 DETIK)
+                }, 30000); 
 
                 iframe.onload = () => {
                     isLoaded = true;
@@ -130,10 +131,9 @@
                     const duration = ((endTime - startTime) / 1000).toFixed(2);
                     loadTimeSpan.textContent = `(${duration} dtk)`;
                     iframe.classList.remove('loading-effect');
-                    iframe.onload = null; // Hapus event listener setelah selesai
+                    iframe.onload = null; 
                 };
 
-                // Handler jika terjadi error saat memuat iframe
                 iframe.onerror = () => {
                     isLoaded = true;
                     clearTimeout(timeout);
@@ -143,7 +143,6 @@
                 };
 
                 try {
-                    // Refresh iframe dengan cache-busting
                     const originalSrc = iframe.src.split('?')[0];
                     iframe.src = `${originalSrc}?t=${new Date().getTime()}`;
                 } catch (e) {
@@ -160,24 +159,30 @@
                 iframes.forEach(refreshIframe);
             }
 
-            // Fungsi untuk mengatur refresh serentak
-            function setupSimpleRefresh() {
-                const refreshInterval = 60000; // 60 detik
-                setInterval(refreshAllIframes, refreshInterval);
+            // Fungsi untuk mengatur auto refresh dan countdown
+            function setupAutoRefreshAndCountdown() {
+                const countdownDisplay = document.getElementById('countdown-timer');
+                let countdown = REFRESH_INTERVAL_SECONDS;
+
+                setInterval(() => {
+                    countdown--;
+                    if (countdown < 0) {
+                        refreshAllIframes();
+                        countdown = REFRESH_INTERVAL_SECONDS;
+                    }
+                    countdownDisplay.textContent = countdown;
+                }, 1000); // Timer berjalan setiap detik
             }
+
 
             // --- PROSES INISIALISASI ---
             
-            // Panggil scaleIframes setelah gambar dan konten lain dimuat untuk akurasi
             window.addEventListener('load', () => {
                 scaleIframes();
-                // Lakukan refresh pertama kali saat halaman dimuat untuk mendapatkan waktu muat awal
-                refreshAllIframes();
-                // Mulai proses refresh berulang
-                setupSimpleRefresh();
+                refreshAllIframes(); // Lakukan refresh pertama kali
+                setupAutoRefreshAndCountdown(); // Mulai proses auto-refresh dan countdown
             });
             
-            // Tambahkan event listener untuk resize
             window.addEventListener('resize', scaleIframes);
         });
     </script>
