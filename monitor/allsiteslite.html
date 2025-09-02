@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="900"> <!-- Refresh halaman setiap 15 menit -->
     <title>Dasbor Monitoring Situs (Iframe Scaled)</title>
-    <!-- Memuat Tailwind CSS untuk styling (URL diperbaiki) -->
+    <!-- Memuat Tailwind CSS untuk styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Memuat Font Inter dari Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,11 +26,11 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900">
+<body class="bg-gray-900">
 
     <div class="container mx-auto p-2">
         <!-- Header Halaman -->
-        <header class="text-center my-4 text-gray-600 dark:text-gray-400 text-sm">
+        <header class="text-center my-4 text-gray-400 text-sm">
              <p>
                 Auto-refresh dalam: <span id="countdown-timer" class="font-bold">30</span> detik.
             </p>
@@ -70,14 +71,21 @@
             // Fungsi untuk membuat HTML widget
             function createWidgetHTML(service) {
                 const safeId = service.name.replace(/[^a-zA-Z0-9]/g, '-');
-                const targetUrl = service.originalUrl || service.url; // Gunakan URL asli jika ada, jika tidak gunakan URL proxy/biasa
+                const targetUrl = service.originalUrl || service.url;
                 return `
-                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col">
-                        <div class="p-2 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                            <h3 class="font-bold text-sm text-gray-800 dark:text-white truncate">${service.name}</h3>
-                            <span id="load-time-${safeId}" class="text-xs text-gray-500 dark:text-gray-400 ml-2 flex-shrink-0"></span>
+                    <div class="bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col">
+                        <div class="p-2 border-b border-gray-700 flex justify-between items-center">
+                            <h3 class="font-bold text-sm text-white truncate">${service.name}</h3>
+                            <span id="load-time-${safeId}" class="text-xs text-gray-400 ml-2 flex-shrink-0"></span>
                         </div>
                         <div class="iframe-container relative overflow-hidden">
+                            <!-- Elemen Ikon Loading -->
+                            <div id="loader-${safeId}" class="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-800 bg-opacity-75 z-20" style="display: none;">
+                                <svg class="animate-spin h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </div>
                             <div class="absolute top-0 left-0 w-full h-full z-10 cursor-pointer" onclick="window.open('${targetUrl}', '_blank');" title="Buka ${service.name} di tab baru"></div>
                             <iframe id="iframe-${safeId}" src="${service.url}" class="scalable-iframe absolute top-0 left-0" frameborder="0" scrolling="no" style="width: ${IFRAME_WIDTH}px; height: ${IFRAME_HEIGHT}px; transform-origin: 0 0; border: 0;" title="Tampilan Sematan untuk ${service.name}">Browser Anda tidak mendukung iframe.</iframe>
                         </div>
@@ -111,12 +119,14 @@
             function refreshIframe(iframe) {
                 const safeId = iframe.id.replace('iframe-', '');
                 const loadTimeSpan = document.getElementById(`load-time-${safeId}`);
+                const loader = document.getElementById(`loader-${safeId}`);
                 
-                if (!loadTimeSpan) return;
+                if (!loadTimeSpan || !loader) return;
 
-                // Reset state
+                // Reset state dan tampilkan loader
                 loadTimeSpan.textContent = '(memuat...)';
                 iframe.classList.add('loading-effect');
+                loader.style.display = 'flex';
                 
                 const startTime = performance.now();
                 let isLoaded = false;
@@ -125,6 +135,7 @@
                     if (!isLoaded) {
                         loadTimeSpan.textContent = '(gagal)';
                         iframe.classList.remove('loading-effect');
+                        loader.style.display = 'none'; // Sembunyikan loader
                         iframe.onload = null; 
                     }
                 }, 30000); 
@@ -136,6 +147,7 @@
                     const duration = ((endTime - startTime) / 1000).toFixed(2);
                     loadTimeSpan.textContent = `(${duration} dtk)`;
                     iframe.classList.remove('loading-effect');
+                    loader.style.display = 'none'; // Sembunyikan loader
                     iframe.onload = null; 
                 };
 
@@ -144,21 +156,22 @@
                     clearTimeout(timeout);
                     loadTimeSpan.textContent = '(error)';
                     iframe.classList.remove('loading-effect');
+                    loader.style.display = 'none'; // Sembunyikan loader
                     iframe.onload = null;
                 };
 
                 try {
-                    // Cek jika URL mengandung parameter kustom sebelumnya, lalu bangun ulang
                     const urlParts = iframe.src.split('?');
                     const baseSrc = urlParts[0];
                     const params = new URLSearchParams(urlParts.length > 1 ? urlParts[1] : '');
-                    params.set('t', new Date().getTime()); // Tambah atau update parameter 't'
+                    params.set('t', new Date().getTime());
                     iframe.src = `${baseSrc}?${params.toString()}`;
 
                 } catch (e) {
                     console.error("Gagal merefresh iframe:", iframe.title, e);
                     loadTimeSpan.textContent = '(error)';
                     iframe.classList.remove('loading-effect');
+                    loader.style.display = 'none'; // Sembunyikan loader
                     clearTimeout(timeout);
                 }
             }
@@ -181,7 +194,7 @@
                         countdown = REFRESH_INTERVAL_SECONDS;
                     }
                     countdownDisplay.textContent = countdown;
-                }, 1000); // Timer berjalan setiap detik
+                }, 1000);
             }
 
 
@@ -189,8 +202,8 @@
             
             window.addEventListener('load', () => {
                 scaleIframes();
-                refreshAllIframes(); // Lakukan refresh pertama kali
-                setupAutoRefreshAndCountdown(); // Mulai proses auto-refresh dan countdown
+                refreshAllIframes();
+                setupAutoRefreshAndCountdown();
             });
             
             window.addEventListener('resize', scaleIframes);
@@ -198,4 +211,5 @@
     </script>
 </body>
 </html>
+
 
