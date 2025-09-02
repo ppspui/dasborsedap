@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dasbor Monitoring Situs (Iframe Scaled)</title>
+    <!-- Memuat Tailwind CSS untuk styling (URL diperbaiki) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Memuat Font Inter dari Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Menggunakan font Inter sebagai default */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Menambahkan transisi halus untuk efek saturasi */
+        .scalable-iframe {
+            transition: filter 0.5s ease-in-out;
+        }
+        /* Kelas untuk membuat iframe menjadi hitam-putih */
+        .loading-effect {
+            filter: saturate(0);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900">
+
+    <div class="container mx-auto p-2">
+        <!-- Header Halaman -->
+        <header class="text-center my-4 text-gray-600 dark:text-gray-400 text-sm">
+             <p>
+                Auto-refresh dalam: <span id="countdown-timer" class="font-bold">30</span> detik.
+            </p>
+        </header>
+
+        <!-- Bagian untuk Kategori Layanan -->
+        <section class="mb-12">
+            <!-- Judul bagian telah dihapus -->
+            <main id="iframe-grid-layanan" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
+                <!-- Widget Layanan akan dimasukkan di sini -->
+            </main>
+        </section>
+        
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const REFRESH_INTERVAL_SECONDS = 30;
+            
+            const servicesToEmbed = [
+                { name: 'emas3.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?site=emas3.ui.ac.id', originalUrl: 'https://emas3.ui.ac.id', category: 'layanan' },
+                { name: 'emas2.ui.ac.id', url: 'https://emas2.ui.ac.id', category: 'layanan' },
+                { name: 'idols2.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?site=idols2.ui.ac.id', originalUrl: 'https://idols2.ui.ac.id', category: 'layanan' },
+                { name: 'idols.ui.ac.id', url: 'https://idols.ui.ac.id', category: 'layanan' },
+                { name: 'ocw.ui.ac.id', url: 'https://ocw.ui.ac.id', category: 'layanan' },
+                { name: 'pjj.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?site=pjj.ui.ac.id', originalUrl: 'https://pjj.ui.ac.id', category: 'layanan' },
+                { name: 'ovis.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?site=ovis.ui.ac.id', originalUrl: 'https://ovis.ui.ac.id', category: 'layanan' },
+                { name: 'dppd.ui.ac.id', url: 'https://dppd.ui.ac.id', category: 'layanan' }
+            ];
+
+            const gridContainers = {
+                layanan: document.getElementById('iframe-grid-layanan')
+            };
+            
+            const IFRAME_WIDTH = 1280;
+            const IFRAME_HEIGHT = 960; // Rasio 4:3
+
+            // Fungsi untuk membuat HTML widget
+            function createWidgetHTML(service) {
+                const safeId = service.name.replace(/[^a-zA-Z0-9]/g, '-');
+                const targetUrl = service.originalUrl || service.url; // Gunakan URL asli jika ada, jika tidak gunakan URL proxy/biasa
+                return `
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col">
+                        <div class="p-2 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                            <h3 class="font-bold text-sm text-gray-800 dark:text-white truncate">${service.name}</h3>
+                            <span id="load-time-${safeId}" class="text-xs text-gray-500 dark:text-gray-400 ml-2 flex-shrink-0"></span>
+                        </div>
+                        <div class="iframe-container relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-full h-full z-10 cursor-pointer" onclick="window.open('${targetUrl}', '_blank');" title="Buka ${service.name} di tab baru"></div>
+                            <iframe id="iframe-${safeId}" src="${service.url}" class="scalable-iframe absolute top-0 left-0" frameborder="0" scrolling="no" style="width: ${IFRAME_WIDTH}px; height: ${IFRAME_HEIGHT}px; transform-origin: 0 0; border: 0;" title="Tampilan Sematan untuk ${service.name}">Browser Anda tidak mendukung iframe.</iframe>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Memasukkan widget ke grid yang sesuai
+            servicesToEmbed.forEach(service => {
+                const container = gridContainers[service.category];
+                if (container) {
+                    const widgetHTML = createWidgetHTML(service);
+                    container.innerHTML += widgetHTML;
+                }
+            });
+
+            // Fungsi untuk menskalakan iframe agar pas
+            function scaleIframes() {
+                const containers = document.querySelectorAll('.iframe-container');
+                containers.forEach(container => {
+                    const iframe = container.querySelector('.scalable-iframe');
+                    if (!iframe) return;
+                    const containerWidth = container.clientWidth;
+                    const scale = containerWidth / IFRAME_WIDTH;
+                    iframe.style.transform = `scale(${scale})`;
+                    container.style.height = `${IFRAME_HEIGHT * scale}px`;
+                });
+            }
+
+            // Fungsi untuk merefresh satu iframe dan mengukur waktu muat
+            function refreshIframe(iframe) {
+                const safeId = iframe.id.replace('iframe-', '');
+                const loadTimeSpan = document.getElementById(`load-time-${safeId}`);
+                
+                if (!loadTimeSpan) return;
+
+                // Reset state
+                loadTimeSpan.textContent = '(memuat...)';
+                iframe.classList.add('loading-effect');
+                
+                const startTime = performance.now();
+                let isLoaded = false;
+
+                const timeout = setTimeout(() => {
+                    if (!isLoaded) {
+                        loadTimeSpan.textContent = '(gagal)';
+                        iframe.classList.remove('loading-effect');
+                        iframe.onload = null; 
+                    }
+                }, 30000); 
+
+                iframe.onload = () => {
+                    isLoaded = true;
+                    clearTimeout(timeout);
+                    const endTime = performance.now();
+                    const duration = ((endTime - startTime) / 1000).toFixed(2);
+                    loadTimeSpan.textContent = `(${duration} dtk)`;
+                    iframe.classList.remove('loading-effect');
+                    iframe.onload = null; 
+                };
+
+                iframe.onerror = () => {
+                    isLoaded = true;
+                    clearTimeout(timeout);
+                    loadTimeSpan.textContent = '(error)';
+                    iframe.classList.remove('loading-effect');
+                    iframe.onload = null;
+                };
+
+                try {
+                    // Cek jika URL mengandung parameter kustom sebelumnya, lalu bangun ulang
+                    const urlParts = iframe.src.split('?');
+                    const baseSrc = urlParts[0];
+                    const params = new URLSearchParams(urlParts.length > 1 ? urlParts[1] : '');
+                    params.set('t', new Date().getTime()); // Tambah atau update parameter 't'
+                    iframe.src = `${baseSrc}?${params.toString()}`;
+
+                } catch (e) {
+                    console.error("Gagal merefresh iframe:", iframe.title, e);
+                    loadTimeSpan.textContent = '(error)';
+                    iframe.classList.remove('loading-effect');
+                    clearTimeout(timeout);
+                }
+            }
+
+            // Fungsi untuk merefresh semua iframe
+            function refreshAllIframes() {
+                const iframes = document.querySelectorAll('.scalable-iframe');
+                iframes.forEach(refreshIframe);
+            }
+
+            // Fungsi untuk mengatur auto refresh dan countdown
+            function setupAutoRefreshAndCountdown() {
+                const countdownDisplay = document.getElementById('countdown-timer');
+                let countdown = REFRESH_INTERVAL_SECONDS;
+
+                setInterval(() => {
+                    countdown--;
+                    if (countdown < 0) {
+                        refreshAllIframes();
+                        countdown = REFRESH_INTERVAL_SECONDS;
+                    }
+                    countdownDisplay.textContent = countdown;
+                }, 1000); // Timer berjalan setiap detik
+            }
+
+
+            // --- PROSES INISIALISASI ---
+            
+            window.addEventListener('load', () => {
+                scaleIframes();
+                refreshAllIframes(); // Lakukan refresh pertama kali
+                setupAutoRefreshAndCountdown(); // Mulai proses auto-refresh dan countdown
+            });
+            
+            window.addEventListener('resize', scaleIframes);
+        });
+    </script>
+</body>
+</html>
+
