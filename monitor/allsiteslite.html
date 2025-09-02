@@ -24,6 +24,32 @@
         .loading-effect {
             filter: saturate(0);
         }
+        /* Animasi untuk efek glowing pada kartu yang gagal dimuat */
+        @keyframes glowing {
+            0% { box-shadow: 0 0 3px #ef4444; }
+            50% { box-shadow: 0 0 15px #ef4444; }
+            100% { box-shadow: 0 0 3px #ef4444; }
+        }
+        .card-alert {
+            animation: glowing 1.5s infinite ease-in-out;
+            border: 1px solid #ef4444;
+        }
+        /* Animasi untuk ikon yang berkedip */
+        @keyframes blinking {
+            50% { opacity: 0; }
+        }
+        .blinking-icon {
+            animation: blinking 1s infinite;
+        }
+        /* --- EFEK BARU: Interaksi Hover --- */
+        .widget-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Transisi halus */
+        }
+        /* Sedikit perbesar kartu yang di-hover */
+        .widget-card:hover {
+            transform: scale(1.05);
+            z-index: 10; /* Pastikan kartu yang dihover ada di atas yang lain */
+        }
     </style>
 </head>
 <body class="bg-gray-900">
@@ -51,14 +77,14 @@
             const REFRESH_INTERVAL_SECONDS = 30;
             
             const servicesToEmbed = [
-                { name: 'emas3.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?site=emas3.ui.ac.id', originalUrl: 'https://emas3.ui.ac.id', category: 'layanan' },
-                { name: 'emas2.ui.ac.id', url: 'https://emas2.ui.ac.id', category: 'layanan' },
-                { name: 'idols2.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?site=idols2.ui.ac.id', originalUrl: 'https://idols2.ui.ac.id', category: 'layanan' },
-                { name: 'idols.ui.ac.id', url: 'https://idols.ui.ac.id', category: 'layanan' },
-                { name: 'ocw.ui.ac.id', url: 'https://ocw.ui.ac.id', category: 'layanan' },
-                { name: 'pjj.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?site=pjj.ui.ac.id', originalUrl: 'https://pjj.ui.ac.id', category: 'layanan' },
-                { name: 'ovis.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?site=ovis.ui.ac.id', originalUrl: 'https://ovis.ui.ac.id', category: 'layanan' },
-                { name: 'dppd.ui.ac.id', url: 'https://dppd.ui.ac.id', category: 'layanan' }
+                { name: 'emas3.ui.ac.id', url: 'https://bukalms.ppspui.workers.dev/?site=emas3.ui.ac.id', originalUrl: 'https://emas3.ui.ac.id', category: 'layanan' },
+                { name: 'emas2.ui.ac.id', url: 'https://bukalms.ppspui.workers.dev/?site=emas2.ui.ac.id', originalUrl: 'https://emas2.ui.ac.id', category: 'layanan' },
+                { name: 'idols2.ui.ac.id', url: 'https://bukalms.ppspui.workers.dev/?site=idols2.ui.ac.id', originalUrl: 'https://idols2.ui.ac.id', category: 'layanan' },
+                { name: 'idols.ui.ac.id', url: 'https://bukalms.ppspui.workers.dev/?site=idols.ui.ac.id', originalUrl: 'https://idols.ui.ac.id', category: 'layanan' },
+                { name: 'ocw.ui.ac.id', url: 'https://bukalms.ppspui.workers.dev/?site=ocw.ui.ac.id', originalUrl: 'https://ocw.ui.ac.id', category: 'layanan' },
+                { name: 'pjj.ui.ac.id', url: 'https://bukalms.ppspui.workers.dev/?site=pjj.ui.ac.id', originalUrl: 'https://pjj.ui.ac.id', category: 'layanan' },
+                { name: 'ovis.ui.ac.id', url: 'https://bukalms.ppspui.workers.dev/?site=ovis.ui.ac.id', originalUrl: 'https://ovis.ui.ac.id', category: 'layanan' },
+                { name: 'dppd.ui.ac.id', url: 'https://bukalms.ppspui.workers.dev/?site=dppd.ui.ac.id', originalUrl: 'https://dppd.ui.ac.id', category: 'layanan' }
             ];
 
             const gridContainers = {
@@ -73,13 +99,21 @@
                 const safeId = service.name.replace(/[^a-zA-Z0-9]/g, '-');
                 const targetUrl = service.originalUrl || service.url;
                 return `
-                    <div class="bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col">
+                    <div id="card-${safeId}" class="widget-card bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col relative">
                         <div class="p-2 border-b border-gray-700 flex justify-between items-center">
-                            <h3 class="font-bold text-sm text-white truncate">${service.name}</h3>
+                            <div class="flex items-center min-w-0">
+                                <!-- Ikon Alert (tersembunyi secara default) -->
+                                <div id="alert-icon-${safeId}" class="mr-2 flex-shrink-0" style="display: none;">
+                                    <svg class="w-5 h-5 text-red-500 blinking-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                                <h3 class="font-bold text-sm text-white truncate">${service.name}</h3>
+                                ${service.originalUrl ? '<span class="ml-1.5 text-gray-500" title="Melalui Proxy">🛡️</span>' : ''}
+                            </div>
                             <span id="load-time-${safeId}" class="text-xs text-gray-400 ml-2 flex-shrink-0"></span>
                         </div>
                         <div class="iframe-container relative overflow-hidden">
-                            <!-- Elemen Ikon Loading -->
                             <div id="loader-${safeId}" class="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-gray-800 bg-opacity-75 z-20" style="display: none;">
                                 <svg class="animate-spin h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -87,7 +121,7 @@
                                 </svg>
                             </div>
                             <div class="absolute top-0 left-0 w-full h-full z-10 cursor-pointer" onclick="window.open('${targetUrl}', '_blank');" title="Buka ${service.name} di tab baru"></div>
-                            <iframe id="iframe-${safeId}" src="${service.url}" class="scalable-iframe absolute top-0 left-0" frameborder="0" scrolling="no" style="width: ${IFRAME_WIDTH}px; height: ${IFRAME_HEIGHT}px; transform-origin: 0 0; border: 0;" title="Tampilan Sematan untuk ${service.name}">Browser Anda tidak mendukung iframe.</iframe>
+                            <iframe id="iframe-${safeId}" src="about:blank" data-src="${service.url}" class="scalable-iframe absolute top-0 left-0" frameborder="0" scrolling="no" style="width: ${IFRAME_WIDTH}px; height: ${IFRAME_HEIGHT}px; transform-origin: 0 0; border: 0;" title="Tampilan Sematan untuk ${service.name}">Browser Anda tidak mendukung iframe.</iframe>
                         </div>
                     </div>
                 `;
@@ -97,15 +131,13 @@
             servicesToEmbed.forEach(service => {
                 const container = gridContainers[service.category];
                 if (container) {
-                    const widgetHTML = createWidgetHTML(service);
-                    container.innerHTML += widgetHTML;
+                    container.innerHTML += createWidgetHTML(service);
                 }
             });
 
             // Fungsi untuk menskalakan iframe agar pas
             function scaleIframes() {
-                const containers = document.querySelectorAll('.iframe-container');
-                containers.forEach(container => {
+                document.querySelectorAll('.iframe-container').forEach(container => {
                     const iframe = container.querySelector('.scalable-iframe');
                     if (!iframe) return;
                     const containerWidth = container.clientWidth;
@@ -114,16 +146,21 @@
                     container.style.height = `${IFRAME_HEIGHT * scale}px`;
                 });
             }
-
+            
             // Fungsi untuk merefresh satu iframe dan mengukur waktu muat
             function refreshIframe(iframe) {
                 const safeId = iframe.id.replace('iframe-', '');
                 const loadTimeSpan = document.getElementById(`load-time-${safeId}`);
                 const loader = document.getElementById(`loader-${safeId}`);
-                
-                if (!loadTimeSpan || !loader) return;
+                const card = document.getElementById(`card-${safeId}`);
+                const alertIcon = document.getElementById(`alert-icon-${safeId}`);
+
+                if (!loadTimeSpan || !loader || !card || !alertIcon) return;
 
                 // Reset state dan tampilkan loader
+                card.classList.remove('card-alert');
+                alertIcon.style.display = 'none';
+                loadTimeSpan.classList.remove('text-red-500', 'font-bold');
                 loadTimeSpan.textContent = '(memuat...)';
                 iframe.classList.add('loading-effect');
                 loader.style.display = 'flex';
@@ -131,85 +168,117 @@
                 const startTime = performance.now();
                 let isLoaded = false;
 
+                const handleFailure = (reason) => {
+                    loadTimeSpan.textContent = `(${reason})`;
+                    loadTimeSpan.classList.add('text-red-500', 'font-bold');
+                    card.classList.add('card-alert');
+                    alertIcon.style.display = 'block';
+                    iframe.classList.remove('loading-effect');
+                    loader.style.display = 'none';
+                    iframe.onload = null;
+                };
+
                 const timeout = setTimeout(() => {
                     if (!isLoaded) {
-                        loadTimeSpan.textContent = '(gagal)';
-                        iframe.classList.remove('loading-effect');
-                        loader.style.display = 'none'; // Sembunyikan loader
-                        iframe.onload = null; 
+                        handleFailure('gagal');
                     }
-                }, 30000); 
+                }, 30000);
 
                 iframe.onload = () => {
                     isLoaded = true;
                     clearTimeout(timeout);
                     const endTime = performance.now();
-                    const duration = ((endTime - startTime) / 1000).toFixed(2);
-                    loadTimeSpan.textContent = `(${duration} dtk)`;
-                    iframe.classList.remove('loading-effect');
-                    loader.style.display = 'none'; // Sembunyikan loader
-                    iframe.onload = null; 
+                    const duration = (endTime - startTime) / 1000;
+
+                    let isError = false;
+
+                    try {
+                        const iframeTitle = iframe.contentDocument.title;
+                        const errorKeywords = [
+                            'Web server is down', '521',
+                            '502 Bad Gateway', '502',
+                            '503 Service Unavailable', '503',
+                            '504 Gateway Timeout', '504',
+                            'Error'
+                        ];
+                        const isErrorPage = errorKeywords.some(keyword => iframeTitle.toLowerCase().includes(keyword.toLowerCase()));
+                        if (isErrorPage) {
+                            isError = true;
+                        }
+                    } catch (e) {
+                        // Ini akan selalu terjadi untuk iframe cross-origin.
+                        // Kita gunakan heuristik: jika load sangat cepat, kemungkinan itu halaman error dari CDN/proxy.
+                        if (duration < 0.25) { // Batas waktu 250ms
+                            console.warn(`Waktu muat sangat cepat (${duration.toFixed(2)}s) untuk iframe cross-origin. Diasumsikan halaman error.`);
+                            isError = true;
+                        }
+                    }
+
+                    if (isError) {
+                        handleFailure('halaman error');
+                    } else {
+                        // Logika sukses
+                        loadTimeSpan.textContent = `(${duration.toFixed(2)} dtk)`;
+                        iframe.classList.remove('loading-effect');
+                        loader.style.display = 'none';
+                        iframe.onload = null;
+                    }
                 };
 
                 iframe.onerror = () => {
                     isLoaded = true;
                     clearTimeout(timeout);
-                    loadTimeSpan.textContent = '(error)';
-                    iframe.classList.remove('loading-effect');
-                    loader.style.display = 'none'; // Sembunyikan loader
-                    iframe.onload = null;
+                    handleFailure('error');
                 };
 
                 try {
-                    const urlParts = iframe.src.split('?');
+                    const originalUrl = iframe.dataset.src;
+                    if (!originalUrl) {
+                        handleFailure('no-src');
+                        return;
+                    }
+                    const urlParts = originalUrl.split('?');
                     const baseSrc = urlParts[0];
                     const params = new URLSearchParams(urlParts.length > 1 ? urlParts[1] : '');
                     params.set('t', new Date().getTime());
                     iframe.src = `${baseSrc}?${params.toString()}`;
-
                 } catch (e) {
                     console.error("Gagal merefresh iframe:", iframe.title, e);
-                    loadTimeSpan.textContent = '(error)';
-                    iframe.classList.remove('loading-effect');
-                    loader.style.display = 'none'; // Sembunyikan loader
+                    isLoaded = true;
                     clearTimeout(timeout);
+                    handleFailure('error');
                 }
             }
 
-            // Fungsi untuk merefresh semua iframe
             function refreshAllIframes() {
-                const iframes = document.querySelectorAll('.scalable-iframe');
-                iframes.forEach(refreshIframe);
+                document.querySelectorAll('.scalable-iframe').forEach(refreshIframe);
             }
 
-            // Fungsi untuk mengatur auto refresh dan countdown
             function setupAutoRefreshAndCountdown() {
                 const countdownDisplay = document.getElementById('countdown-timer');
                 let countdown = REFRESH_INTERVAL_SECONDS;
 
                 setInterval(() => {
                     countdown--;
-                    if (countdown < 0) {
+                    if (countdown <= 0) {
                         refreshAllIframes();
                         countdown = REFRESH_INTERVAL_SECONDS;
                     }
                     countdownDisplay.textContent = countdown;
                 }, 1000);
             }
-
-
-            // --- PROSES INISIALISASI ---
             
-            window.addEventListener('load', () => {
-                scaleIframes();
-                refreshAllIframes();
-                setupAutoRefreshAndCountdown();
-            });
+            // 1. Skala kartu setelah dibuat
+            scaleIframes();
             
+            // 2. Mulai proses refresh & countdown segera
+            refreshAllIframes();
+            setupAutoRefreshAndCountdown();
+
+            // 3. Tetap skala ulang saat ukuran jendela berubah
             window.addEventListener('resize', scaleIframes);
         });
     </script>
 </body>
 </html>
-
 
