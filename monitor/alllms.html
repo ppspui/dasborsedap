@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dasbor Monitoring Situs (Iframe Scaled)</title>
-    <!-- Memuat Tailwind CSS untuk styling -->
+    <!-- Memuat Tailwind CSS untuk styling (URL diperbaiki) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Memuat Font Inter dari Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -50,9 +50,9 @@
             const REFRESH_INTERVAL_SECONDS = 30;
             
             const servicesToEmbed = [
-                { name: 'emas3.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/https/emas3.ui.ac.id', category: 'layanan' },
+                { name: 'emas3.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?url=https://emas3.ui.ac.id', originalUrl: 'https://emas3.ui.ac.id', category: 'layanan' },
                 { name: 'emas2.ui.ac.id', url: 'https://emas2.ui.ac.id', category: 'layanan' },
-                { name: 'idols2.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/https/idols2.ui.ac.id', category: 'layanan' },
+                { name: 'idols2.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?url=https://idols2.ui.ac.id', originalUrl: 'https://idols2.ui.ac.id', category: 'layanan' },
                 { name: 'idols.ui.ac.id', url: 'https://idols.ui.ac.id', category: 'layanan' }
             ];
 
@@ -66,6 +66,7 @@
             // Fungsi untuk membuat HTML widget
             function createWidgetHTML(service) {
                 const safeId = service.name.replace(/[^a-zA-Z0-9]/g, '-');
+                const targetUrl = service.originalUrl || service.url; // Gunakan URL asli jika ada, jika tidak gunakan URL proxy/biasa
                 return `
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col">
                         <div class="p-2 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
@@ -73,7 +74,7 @@
                             <span id="load-time-${safeId}" class="text-xs text-gray-500 dark:text-gray-400 ml-2 flex-shrink-0"></span>
                         </div>
                         <div class="iframe-container relative overflow-hidden">
-                            <div class="absolute top-0 left-0 w-full h-full z-10 cursor-pointer" onclick="window.open('${service.url}', '_blank');" title="Buka ${service.name} di tab baru"></div>
+                            <div class="absolute top-0 left-0 w-full h-full z-10 cursor-pointer" onclick="window.open('${targetUrl}', '_blank');" title="Buka ${service.name} di tab baru"></div>
                             <iframe id="iframe-${safeId}" src="${service.url}" class="scalable-iframe absolute top-0 left-0" frameborder="0" scrolling="no" style="width: ${IFRAME_WIDTH}px; height: ${IFRAME_HEIGHT}px; transform-origin: 0 0; border: 0;" title="Tampilan Sematan untuk ${service.name}">Browser Anda tidak mendukung iframe.</iframe>
                         </div>
                     </div>
@@ -188,5 +189,4 @@
     </script>
 </body>
 </html>
-
 
