@@ -27,16 +27,16 @@
 </head>
 <body class="bg-gray-100 dark:bg-gray-900">
 
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+    <div class="container mx-auto p-2">
         <!-- Header Halaman -->
-        <header class="text-center mb-8">
+        <header class="text-center mb-4">
             <!-- Judul dan subjudul telah dihapus -->
         </header>
 
         <!-- Bagian untuk Kategori Layanan -->
         <section class="mb-12">
             <!-- Judul bagian telah dihapus -->
-            <main id="iframe-grid-layanan" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+            <main id="iframe-grid-layanan" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
                 <!-- Widget Layanan akan dimasukkan di sini -->
             </main>
         </section>
@@ -66,8 +66,9 @@
                 const safeId = service.name.replace(/[^a-zA-Z0-9]/g, '-');
                 return `
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col">
-                        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-                            <h3 class="font-bold text-gray-800 dark:text-white truncate">${service.name}</h3>
+                        <div class="p-2 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                            <h3 class="font-bold text-sm text-gray-800 dark:text-white truncate">${service.name}</h3>
+                            <span id="load-time-${safeId}" class="text-xs text-gray-500 dark:text-gray-400 ml-2 flex-shrink-0"></span>
                         </div>
                         <div class="iframe-container relative overflow-hidden">
                             <div class="absolute top-0 left-0 w-full h-full z-10 cursor-pointer" onclick="window.open('${service.url}', '_blank');" title="Buka ${service.name} di tab baru"></div>
@@ -99,33 +100,70 @@
                 });
             }
 
-            // Fungsi untuk mengatur refresh serentak dengan efek saturasi
+            // Fungsi untuk merefresh satu iframe dan mengukur waktu muat
+            function refreshIframe(iframe) {
+                const safeId = iframe.id.replace('iframe-', '');
+                const loadTimeSpan = document.getElementById(`load-time-${safeId}`);
+                
+                if (!loadTimeSpan) return;
+
+                // Reset state
+                loadTimeSpan.textContent = '(memuat...)';
+                iframe.classList.add('loading-effect');
+                
+                const startTime = performance.now();
+                let isLoaded = false;
+
+                // Fallback timer jika iframe gagal dimuat
+                const timeout = setTimeout(() => {
+                    if (!isLoaded) {
+                        loadTimeSpan.textContent = '(gagal)';
+                        iframe.classList.remove('loading-effect');
+                        iframe.onload = null; // Hapus event listener
+                    }
+                }, 30000); // 30 detik timeout (DIPERPANJANG DARI 15 DETIK)
+
+                iframe.onload = () => {
+                    isLoaded = true;
+                    clearTimeout(timeout);
+                    const endTime = performance.now();
+                    const duration = ((endTime - startTime) / 1000).toFixed(2);
+                    loadTimeSpan.textContent = `(${duration} dtk)`;
+                    iframe.classList.remove('loading-effect');
+                    iframe.onload = null; // Hapus event listener setelah selesai
+                };
+
+                // Handler jika terjadi error saat memuat iframe
+                iframe.onerror = () => {
+                    isLoaded = true;
+                    clearTimeout(timeout);
+                    loadTimeSpan.textContent = '(error)';
+                    iframe.classList.remove('loading-effect');
+                    iframe.onload = null;
+                };
+
+                try {
+                    // Refresh iframe dengan cache-busting
+                    const originalSrc = iframe.src.split('?')[0];
+                    iframe.src = `${originalSrc}?t=${new Date().getTime()}`;
+                } catch (e) {
+                    console.error("Gagal merefresh iframe:", iframe.title, e);
+                    loadTimeSpan.textContent = '(error)';
+                    iframe.classList.remove('loading-effect');
+                    clearTimeout(timeout);
+                }
+            }
+
+            // Fungsi untuk merefresh semua iframe
+            function refreshAllIframes() {
+                const iframes = document.querySelectorAll('.scalable-iframe');
+                iframes.forEach(refreshIframe);
+            }
+
+            // Fungsi untuk mengatur refresh serentak
             function setupSimpleRefresh() {
                 const refreshInterval = 60000; // 60 detik
-
-                setInterval(() => {
-                    const iframes = document.querySelectorAll('.scalable-iframe');
-                    iframes.forEach(iframe => {
-                        try {
-                            // 1. Terapkan efek hitam-putih (loading)
-                            iframe.classList.add('loading-effect');
-
-                            // 2. Refresh iframe dengan cache-busting
-                            const originalSrc = iframe.src.split('?')[0];
-                            iframe.src = `${originalSrc}?t=${new Date().getTime()}`;
-
-                            // 3. Hapus efek setelah beberapa detik
-                            setTimeout(() => {
-                                iframe.classList.remove('loading-effect');
-                            }, 2500); // Asumsikan load selesai dalam 2.5 detik
-
-                        } catch (e) {
-                            console.error("Gagal merefresh iframe:", iframe.title, e);
-                            // Jika gagal, tetap hapus efek loading
-                            iframe.classList.remove('loading-effect');
-                        }
-                    });
-                }, refreshInterval);
+                setInterval(refreshAllIframes, refreshInterval);
             }
 
             // --- PROSES INISIALISASI ---
@@ -133,7 +171,9 @@
             // Panggil scaleIframes setelah gambar dan konten lain dimuat untuk akurasi
             window.addEventListener('load', () => {
                 scaleIframes();
-                // Mulai proses refresh serentak
+                // Lakukan refresh pertama kali saat halaman dimuat untuk mendapatkan waktu muat awal
+                refreshAllIframes();
+                // Mulai proses refresh berulang
                 setupSimpleRefresh();
             });
             
@@ -143,4 +183,5 @@
     </script>
 </body>
 </html>
+
 
