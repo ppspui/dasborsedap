@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dasbor Monitoring Situs (Iframe Scaled)</title>
+    <!-- Memuat Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Memuat Font Inter dari Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Menggunakan font Inter sebagai default */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Menambahkan transisi halus untuk efek saturasi */
+        .scalable-iframe {
+            transition: filter 0.5s ease-in-out;
+        }
+        /* Kelas untuk membuat iframe menjadi hitam-putih */
+        .loading-effect {
+            filter: saturate(0);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- Header Halaman -->
+        <header class="text-center mb-8">
+            <!-- Judul dan subjudul telah dihapus -->
+        </header>
+
+        <!-- Bagian untuk Kategori Layanan -->
+        <section class="mb-12">
+            <!-- Judul bagian telah dihapus -->
+            <main id="iframe-grid-layanan" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+                <!-- Widget Layanan akan dimasukkan di sini -->
+            </main>
+        </section>
+        
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DATA INI TELAH DIPERBARUI ---
+            // Daftar domain baru sesuai permintaan Anda.
+            const servicesToEmbed = [
+                { name: 'emas3.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/https/emas3.ui.ac.id', category: 'layanan' },
+                { name: 'emas2.ui.ac.id', url: 'https://emas2.ui.ac.id', category: 'layanan' },
+                { name: 'idols2.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/https/idols2.ui.ac.id', category: 'layanan' },
+                { name: 'idols.ui.ac.id', url: 'https://idols.ui.ac.id', category: 'layanan' }
+            ];
+
+            const gridContainers = {
+                layanan: document.getElementById('iframe-grid-layanan')
+            };
+            
+            const IFRAME_WIDTH = 1280;
+            const IFRAME_HEIGHT = 960; // Rasio 4:3
+
+            // Fungsi untuk membuat HTML widget
+            function createWidgetHTML(service) {
+                const safeId = service.name.replace(/[^a-zA-Z0-9]/g, '-');
+                return `
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col">
+                        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+                            <h3 class="font-bold text-gray-800 dark:text-white truncate">${service.name}</h3>
+                        </div>
+                        <div class="iframe-container relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-full h-full z-10 cursor-pointer" onclick="window.open('${service.url}', '_blank');" title="Buka ${service.name} di tab baru"></div>
+                            <iframe id="iframe-${safeId}" src="${service.url}" class="scalable-iframe absolute top-0 left-0" frameborder="0" scrolling="no" style="width: ${IFRAME_WIDTH}px; height: ${IFRAME_HEIGHT}px; transform-origin: 0 0; border: 0;" title="Tampilan Sematan untuk ${service.name}">Browser Anda tidak mendukung iframe.</iframe>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Memasukkan widget ke grid yang sesuai
+            servicesToEmbed.forEach(service => {
+                const container = gridContainers[service.category];
+                if (container) {
+                    const widgetHTML = createWidgetHTML(service);
+                    container.innerHTML += widgetHTML;
+                }
+            });
+
+            // Fungsi untuk menskalakan iframe agar pas
+            function scaleIframes() {
+                const containers = document.querySelectorAll('.iframe-container');
+                containers.forEach(container => {
+                    const iframe = container.querySelector('.scalable-iframe');
+                    if (!iframe) return;
+                    const containerWidth = container.clientWidth;
+                    const scale = containerWidth / IFRAME_WIDTH;
+                    iframe.style.transform = `scale(${scale})`;
+                    container.style.height = `${IFRAME_HEIGHT * scale}px`;
+                });
+            }
+
+            // Fungsi untuk mengatur refresh serentak dengan efek saturasi
+            function setupSimpleRefresh() {
+                const refreshInterval = 60000; // 60 detik
+
+                setInterval(() => {
+                    const iframes = document.querySelectorAll('.scalable-iframe');
+                    iframes.forEach(iframe => {
+                        try {
+                            // 1. Terapkan efek hitam-putih (loading)
+                            iframe.classList.add('loading-effect');
+
+                            // 2. Refresh iframe dengan cache-busting
+                            const originalSrc = iframe.src.split('?')[0];
+                            iframe.src = `${originalSrc}?t=${new Date().getTime()}`;
+
+                            // 3. Hapus efek setelah beberapa detik
+                            setTimeout(() => {
+                                iframe.classList.remove('loading-effect');
+                            }, 2500); // Asumsikan load selesai dalam 2.5 detik
+
+                        } catch (e) {
+                            console.error("Gagal merefresh iframe:", iframe.title, e);
+                            // Jika gagal, tetap hapus efek loading
+                            iframe.classList.remove('loading-effect');
+                        }
+                    });
+                }, refreshInterval);
+            }
+
+            // --- PROSES INISIALISASI ---
+            
+            // Panggil scaleIframes setelah gambar dan konten lain dimuat untuk akurasi
+            window.addEventListener('load', () => {
+                scaleIframes();
+                // Mulai proses refresh serentak
+                setupSimpleRefresh();
+            });
+            
+            // Tambahkan event listener untuk resize
+            window.addEventListener('resize', scaleIframes);
+        });
+    </script>
+</body>
+</html>
+
