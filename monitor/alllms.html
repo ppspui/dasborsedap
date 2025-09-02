@@ -50,9 +50,9 @@
             const REFRESH_INTERVAL_SECONDS = 30;
             
             const servicesToEmbed = [
-                { name: 'emas3.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?url=https://emas3.ui.ac.id', originalUrl: 'https://emas3.ui.ac.id', category: 'layanan' },
+                { name: 'emas3.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?site=emas3.ui.ac.id', originalUrl: 'https://emas3.ui.ac.id', category: 'layanan' },
                 { name: 'emas2.ui.ac.id', url: 'https://emas2.ui.ac.id', category: 'layanan' },
-                { name: 'idols2.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?url=https://idols2.ui.ac.id', originalUrl: 'https://idols2.ui.ac.id', category: 'layanan' },
+                { name: 'idols2.ui.ac.id (Proxy)', url: 'https://bukalms.ppspui.workers.dev/?site=idols2.ui.ac.id', originalUrl: 'https://idols2.ui.ac.id', category: 'layanan' },
                 { name: 'idols.ui.ac.id', url: 'https://idols.ui.ac.id', category: 'layanan' }
             ];
 
@@ -144,8 +144,13 @@
                 };
 
                 try {
-                    const originalSrc = iframe.src.split('?')[0];
-                    iframe.src = `${originalSrc}?t=${new Date().getTime()}`;
+                    // Cek jika URL mengandung parameter kustom sebelumnya, lalu bangun ulang
+                    const urlParts = iframe.src.split('?');
+                    const baseSrc = urlParts[0];
+                    const params = new URLSearchParams(urlParts.length > 1 ? urlParts[1] : '');
+                    params.set('t', new Date().getTime()); // Tambah atau update parameter 't'
+                    iframe.src = `${baseSrc}?${params.toString()}`;
+
                 } catch (e) {
                     console.error("Gagal merefresh iframe:", iframe.title, e);
                     loadTimeSpan.textContent = '(error)';
