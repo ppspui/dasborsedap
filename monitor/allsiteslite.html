@@ -41,7 +41,7 @@
         .blinking-icon {
             animation: blinking 1s infinite;
         }
-        /* --- EFEK BARU: Interaksi Hover --- */
+        /* Interaksi Hover */
         .widget-card {
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); /* Transisi halus */
         }
@@ -64,7 +64,6 @@
 
         <!-- Bagian untuk Kategori Layanan -->
         <section class="mb-12">
-            <!-- Judul bagian telah dihapus -->
             <main id="iframe-grid-layanan" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
                 <!-- Widget Layanan akan dimasukkan di sini -->
             </main>
@@ -92,9 +91,8 @@
             };
             
             const IFRAME_WIDTH = 1280;
-            const IFRAME_HEIGHT = 960; // Rasio 4:3
+            const IFRAME_HEIGHT = 960;
 
-            // Fungsi untuk membuat HTML widget
             function createWidgetHTML(service) {
                 const safeId = service.name.replace(/[^a-zA-Z0-9]/g, '-');
                 const targetUrl = service.originalUrl || service.url;
@@ -102,7 +100,6 @@
                     <div id="card-${safeId}" class="widget-card bg-gray-800 rounded-xl shadow-md overflow-hidden flex flex-col relative">
                         <div class="p-2 border-b border-gray-700 flex justify-between items-center">
                             <div class="flex items-center min-w-0">
-                                <!-- Ikon Alert (tersembunyi secara default) -->
                                 <div id="alert-icon-${safeId}" class="mr-2 flex-shrink-0" style="display: none;">
                                     <svg class="w-5 h-5 text-red-500 blinking-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
@@ -127,7 +124,6 @@
                 `;
             }
 
-            // Memasukkan widget ke grid yang sesuai
             servicesToEmbed.forEach(service => {
                 const container = gridContainers[service.category];
                 if (container) {
@@ -135,7 +131,6 @@
                 }
             });
 
-            // Fungsi untuk menskalakan iframe agar pas
             function scaleIframes() {
                 document.querySelectorAll('.iframe-container').forEach(container => {
                     const iframe = container.querySelector('.scalable-iframe');
@@ -147,107 +142,86 @@
                 });
             }
             
-            // Fungsi untuk merefresh satu iframe dan mengukur waktu muat
-            function refreshIframe(iframe) {
+            async function refreshIframe(iframe) {
                 const safeId = iframe.id.replace('iframe-', '');
-                const loadTimeSpan = document.getElementById(`load-time-${safeId}`);
-                const loader = document.getElementById(`loader-${safeId}`);
-                const card = document.getElementById(`card-${safeId}`);
-                const alertIcon = document.getElementById(`alert-icon-${safeId}`);
-
-                if (!loadTimeSpan || !loader || !card || !alertIcon) return;
-
-                // Reset state dan tampilkan loader
-                card.classList.remove('card-alert');
-                alertIcon.style.display = 'none';
-                loadTimeSpan.classList.remove('text-red-500', 'font-bold');
-                loadTimeSpan.textContent = '(memuat...)';
-                iframe.classList.add('loading-effect');
-                loader.style.display = 'flex';
-                
-                const startTime = performance.now();
-                let isLoaded = false;
-
-                const handleFailure = (reason) => {
-                    loadTimeSpan.textContent = `(${reason})`;
-                    loadTimeSpan.classList.add('text-red-500', 'font-bold');
-                    card.classList.add('card-alert');
-                    alertIcon.style.display = 'block';
-                    iframe.classList.remove('loading-effect');
-                    loader.style.display = 'none';
-                    iframe.onload = null;
+                const ui = {
+                    loadTimeSpan: document.getElementById(`load-time-${safeId}`),
+                    loader: document.getElementById(`loader-${safeId}`),
+                    card: document.getElementById(`card-${safeId}`),
+                    alertIcon: document.getElementById(`alert-icon-${safeId}`),
                 };
 
-                const timeout = setTimeout(() => {
+                if (Object.values(ui).some(el => !el)) return;
+
+                // Reset UI
+                ui.card.classList.remove('card-alert');
+                ui.alertIcon.style.display = 'none';
+                ui.loadTimeSpan.classList.remove('text-red-500', 'font-bold');
+                ui.loadTimeSpan.textContent = '(memeriksa...)';
+                ui.loader.style.display = 'flex';
+
+                const setFailureState = (reason) => {
+                    ui.loadTimeSpan.textContent = `(${reason})`;
+                    ui.loadTimeSpan.classList.add('text-red-500', 'font-bold');
+                    ui.card.classList.add('card-alert');
+                    ui.alertIcon.style.display = 'block';
+                };
+                
+                const proxyUrl = iframe.dataset.src;
+
+                // LANGKAH 1: Lakukan health check dengan fetch ke proxy.
+                try {
+                    const response = await fetch(proxyUrl);
+                    
+                    if (!response.ok) {
+                        setFailureState(`status ${response.status}`);
+                    } else {
+                        ui.loadTimeSpan.textContent = '(memuat...)';
+                    }
+
+                } catch (e) {
+                    // --- PERUBAHAN UTAMA ---
+                    // Anggap error CORS sebagai tanda situs hidup, bukan sebagai kegagalan.
+                    console.warn(`Fetch ke ${proxyUrl} gagal karena CORS, diasumsikan situs hidup.`, e);
+                    ui.loadTimeSpan.textContent = '(memuat...)';
+                }
+
+                // LANGKAH 2: SELALU muat konten visual ke iframe
+                const visualLoadStartTime = performance.now();
+                let isLoaded = false;
+                const iframeTimeout = setTimeout(() => {
                     if (!isLoaded) {
-                        handleFailure('gagal');
+                         // Hanya tampilkan timeout jika status awal OK
+                        if (!ui.card.classList.contains('card-alert')) {
+                             setFailureState('iframe timeout');
+                        }
+                        ui.loader.style.display = 'none';
                     }
                 }, 30000);
 
                 iframe.onload = () => {
                     isLoaded = true;
-                    clearTimeout(timeout);
-                    const endTime = performance.now();
-                    const duration = (endTime - startTime) / 1000;
-
-                    let isError = false;
-
-                    try {
-                        const iframeTitle = iframe.contentDocument.title;
-                        const errorKeywords = [
-                            'Web server is down', '521',
-                            '502 Bad Gateway', '502',
-                            '503 Service Unavailable', '503',
-                            '504 Gateway Timeout', '504',
-                            'Error'
-                        ];
-                        const isErrorPage = errorKeywords.some(keyword => iframeTitle.toLowerCase().includes(keyword.toLowerCase()));
-                        if (isErrorPage) {
-                            isError = true;
-                        }
-                    } catch (e) {
-                        // Ini akan selalu terjadi untuk iframe cross-origin.
-                        // Kita gunakan heuristik: jika load sangat cepat, kemungkinan itu halaman error dari CDN/proxy.
-                        if (duration < 0.25) { // Batas waktu 250ms
-                            console.warn(`Waktu muat sangat cepat (${duration.toFixed(2)}s) untuk iframe cross-origin. Diasumsikan halaman error.`);
-                            isError = true;
-                        }
+                    clearTimeout(iframeTimeout);
+                    const duration = (performance.now() - visualLoadStartTime) / 1000;
+                    // Hanya update waktu jika status awal OK
+                    if (!ui.card.classList.contains('card-alert')) {
+                        ui.loadTimeSpan.textContent = `(${duration.toFixed(2)} dtk)`;
                     }
-
-                    if (isError) {
-                        handleFailure('halaman error');
-                    } else {
-                        // Logika sukses
-                        loadTimeSpan.textContent = `(${duration.toFixed(2)} dtk)`;
-                        iframe.classList.remove('loading-effect');
-                        loader.style.display = 'none';
-                        iframe.onload = null;
-                    }
+                    ui.loader.style.display = 'none';
                 };
-
+                
                 iframe.onerror = () => {
                     isLoaded = true;
-                    clearTimeout(timeout);
-                    handleFailure('error');
-                };
-
-                try {
-                    const originalUrl = iframe.dataset.src;
-                    if (!originalUrl) {
-                        handleFailure('no-src');
-                        return;
+                    clearTimeout(iframeTimeout);
+                    if (!ui.card.classList.contains('card-alert')) {
+                        setFailureState('iframe error');
                     }
-                    const urlParts = originalUrl.split('?');
-                    const baseSrc = urlParts[0];
-                    const params = new URLSearchParams(urlParts.length > 1 ? urlParts[1] : '');
-                    params.set('t', new Date().getTime());
-                    iframe.src = `${baseSrc}?${params.toString()}`;
-                } catch (e) {
-                    console.error("Gagal merefresh iframe:", iframe.title, e);
-                    isLoaded = true;
-                    clearTimeout(timeout);
-                    handleFailure('error');
-                }
+                    ui.loader.style.display = 'none';
+                };
+                
+                const params = new URLSearchParams(new URL(proxyUrl).search);
+                params.set('t', new Date().getTime());
+                iframe.src = `${proxyUrl.split('?')[0]}?${params.toString()}`;
             }
 
             function refreshAllIframes() {
@@ -268,14 +242,9 @@
                 }, 1000);
             }
             
-            // 1. Skala kartu setelah dibuat
             scaleIframes();
-            
-            // 2. Mulai proses refresh & countdown segera
             refreshAllIframes();
             setupAutoRefreshAndCountdown();
-
-            // 3. Tetap skala ulang saat ukuran jendela berubah
             window.addEventListener('resize', scaleIframes);
         });
     </script>
