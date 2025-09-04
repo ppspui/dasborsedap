@@ -15,7 +15,7 @@
         body {
             font-family: 'Inter', sans-serif;
             /* Latar belakang ini hanya untuk demo, tidak akan terlihat saat di-embed */
-            background: linear-gradient(135deg, #4a90e2 0%, #0e3a6e 100%);
+            background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -267,6 +267,9 @@
                         tampilkanError(msg);
                         ambilDataCuaca(kotaDefault);
                         teksLoading.textContent = "Memuat data...";
+                    },
+                    {
+                        enableHighAccuracy: true // Opsi akurasi tinggi ditambahkan di sini
                     }
                 );
             }
@@ -445,5 +448,7 @@
     </script>
 </body>
 </html>
+
+
 
 
