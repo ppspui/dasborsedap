@@ -1,4 +1,51 @@
-<div id="weather-widget-container" style="width: 380px; height: 120px;">
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widget Cuaca Real-time</title>
+    <!-- Memuat Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Memuat Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Mengatur font default dan tampilan dasar */
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Latar belakang ini hanya untuk demo, tidak akan terlihat saat di-embed */
+            background: linear-gradient(135deg, #4a90e2 0%, #0e3a6e 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        /* Style untuk container widget utama */
+        .weather-widget {
+            /* Transisi untuk perubahan warna yang mulus */
+            transition: background 1.5s ease-in-out;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+        #get-location-btn:hover svg {
+            stroke: #fff;
+        }
+    </style>
+</head>
+<body>
+    <!-- 
+      ===============================================================
+      KODE WIDGET DIMULAI DI SINI
+      Salin semua kode dari <div id="weather-widget-container"> ... </div>
+      dan tempelkan di situs web Anda.
+      Ukuran widget bisa diubah langsung di "style" di bawah ini.
+      ===============================================================
+    -->
+    <div id="weather-widget-container" style="width: 380px; height: 120px;">
         <div id="widget-main" class="weather-widget relative overflow-hidden backdrop-blur-lg p-3 rounded-xl shadow-2xl text-white border border-white/10 flex flex-col justify-between h-full">
             <!-- Canvas untuk efek partikel -->
             <canvas id="particle-canvas" class="absolute top-0 left-0 w-full h-full z-0"></canvas>
@@ -367,3 +414,6 @@
             animate();
         });
     </script>
+</body>
+</html>
+
