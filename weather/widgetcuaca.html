@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widget Cuaca Real-time</title>
+    <!-- Memuat Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Memuat Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Mengatur font default dan tampilan dasar */
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Latar belakang ini hanya untuk demo, tidak akan terlihat saat di-embed */
+            background: linear-gradient(135deg, #4a90e2 0%, #0e3a6e 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        /* Style untuk container widget utama */
+        .weather-widget {
+            /* Transisi untuk perubahan warna yang mulus */
+            transition: background 1.5s ease-in-out;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+        #get-location-btn:hover svg {
+            stroke: #fff;
+        }
+    </style>
+</head>
+<body>
+    <!-- 
+      ===============================================================
+      KODE WIDGET DIMULAI DI SINI
+      Salin semua kode dari <div id="weather-widget-container"> ... </div>
+      dan tempelkan di situs web Anda.
+      Ukuran widget bisa diubah langsung di "style" di bawah ini.
+      ===============================================================
+    -->
+    <div id="weather-widget-container" style="width: 380px; height: 120px;">
+        <div id="widget-main" class="weather-widget relative overflow-hidden backdrop-blur-lg p-3 rounded-xl shadow-2xl text-white border border-white/10 flex flex-col justify-between h-full">
+            <!-- Canvas untuk efek partikel kunang-kunang -->
+            <canvas id="particle-canvas" class="absolute top-0 left-0 w-full h-full z-0"></canvas>
+            
+            <!-- Menampilkan pesan loading awal -->
+            <div id="loading-state" class="relative z-10 flex items-center justify-center h-full">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span id="loading-text">Memuat data...</span>
+            </div>
+
+            <!-- Konten utama widget (tersembunyi saat loading) -->
+            <div id="widget-content" class="relative z-10 hidden flex items-center justify-between w-full h-full">
+                <!-- Sisi Kiri: Lokasi & Waktu -->
+                <div class="flex flex-col justify-between h-full">
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <p id="location" class="font-bold text-base leading-tight">Memuat...</p>
+                            <button id="get-location-btn" title="Gunakan lokasi saat ini" class="transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="stroke-white/70"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                            </button>
+                        </div>
+                         <p id="date" class="text-xs opacity-80">-- ---- ----</p>
+                    </div>
+                    <p id="time" class="font-mono text-3xl font-bold tracking-tight">--:--:--</p>
+                </div>
+                
+                <!-- Sisi Kanan: Cuaca & Detail -->
+                <div class="flex flex-col items-end justify-between h-full text-right">
+                     <div class="flex items-center gap-2">
+                         <div class="text-right">
+                           <p id="temperature" class="text-4xl font-bold">--°C</p>
+                           <p id="description" class="text-xs opacity-80 capitalize -mt-1">-----</p>
+                         </div>
+                         <div id="weather-icon" class="w-12 h-12">
+                             <!-- Ikon cuaca SVG akan dimasukkan di sini -->
+                         </div>
+                     </div>
+                     <div class="text-xs opacity-80">
+                         <p id="feels-like">Terasa: --°C</p>
+                         <p id="humidity">Kelembapan: --%</p>
+                     </div>
+                     <p id="update-status" class="text-[10px] opacity-60">Memeriksa pembaruan...</p>
+                </div>
+            </div>
+            
+             <!-- Tampilan Error -->
+            <div id="error-state" class="relative z-10 hidden flex flex-col items-center justify-center text-center text-rose-300 h-full">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-8 h-8 mb-2"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                <p class="font-semibold text-sm">Gagal memuat data</p>
+                <p id="error-message" class="text-xs opacity-80 mt-1">Gagal mengambil data cuaca.</p>
+            </div>
+        </div>
+    </div>
+    <!-- ===============================================================
+      AKHIR DARI KODE WIDGET
+      =============================================================== -->
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // ==================================================
+            // KONFIGURASI
+            // ==================================================
+            const kotaDefault = 'Depok, Jawa Barat';
+            const intervalUpdateCuaca = 600000; // 10 menit
+
+            // ==================================================
+            // ELEMEN DOM
+            // ==================================================
+            const elWidgetMain = document.getElementById('widget-main');
+            const elWaktu = document.getElementById('time');
+            const elTanggal = document.getElementById('date');
+            const elLokasi = document.getElementById('location');
+            const elSuhu = document.getElementById('temperature');
+            const elDeskripsi = document.getElementById('description');
+            const elIkon = document.getElementById('weather-icon');
+            const elTerasa = document.getElementById('feels-like');
+            const elKelembapan = document.getElementById('humidity');
+            const elStatusUpdate = document.getElementById('update-status');
+            const tombolLokasi = document.getElementById('get-location-btn');
+            const stateLoading = document.getElementById('loading-state');
+            const teksLoading = document.getElementById('loading-text');
+            const stateKonten = document.getElementById('widget-content');
+            const stateError = document.getElementById('error-state');
+            const pesanError = document.getElementById('error-message');
+
+            let querySaatIni = kotaDefault;
+            let jamTerakhir = -1;
+            let kecepatanAnginRealtime = 0; // Variabel untuk menyimpan kecepatan angin
+            
+            const daftarHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const daftarBulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            const terjemahanCuaca = { "Sunny": "Cerah", "Partly cloudy": "Berawan Sebagian", "Cloudy": "Berawan", "Overcast": "Mendung", "Mist": "Berkabut", "Patchy rain possible": "Mungkin Hujan", "Thundery outbreaks possible": "Potensi Petir", "Fog": "Kabut", "Light rain": "Hujan Ringan", "Moderate rain": "Hujan Sedang", "Heavy rain": "Hujan Lebat", "Light rain shower": "Gerimis", "Clear": "Cerah" };
+
+            function updateLatarDinamis(jam) {
+                const semuaGradien = [
+                    'from-indigo-900', 'via-gray-900', 'to-black',
+                    'from-indigo-800', 'via-purple-700', 'to-orange-500',
+                    'from-sky-400', 'to-blue-500',
+                    'from-blue-400', 'to-cyan-300',
+                    'from-orange-400', 'to-red-500'
+                ];
+                elWidgetMain.classList.remove('bg-gradient-to-br', ...semuaGradien);
+
+                let gradienBaru = [];
+                if (jam >= 0 && jam < 4) { gradienBaru = ['from-indigo-900', 'via-gray-900', 'to-black']; } 
+                else if (jam >= 4 && jam < 6) { gradienBaru = ['from-indigo-800', 'via-purple-700', 'to-orange-500']; } 
+                else if (jam >= 6 && jam < 10) { gradienBaru = ['from-sky-400', 'to-blue-500']; } 
+                else if (jam >= 10 && jam < 16) { gradienBaru = ['from-blue-400', 'to-cyan-300']; } 
+                else if (jam >= 16 && jam < 18) { gradienBaru = ['from-orange-400', 'to-red-500']; } 
+                else { gradienBaru = ['from-indigo-900', 'via-gray-900', 'to-black']; }
+                
+                elWidgetMain.classList.add('bg-gradient-to-br', ...gradienBaru);
+            }
+
+            function updateWaktu() {
+                const sekarang = new Date();
+                const jamSekarang = sekarang.getHours();
+
+                elWaktu.textContent = `${String(jamSekarang).padStart(2, '0')}:${String(sekarang.getMinutes()).padStart(2, '0')}:${String(sekarang.getSeconds()).padStart(2, '0')}`;
+                if (elTanggal.textContent === '-- ---- ----') {
+                    elTanggal.textContent = `${daftarHari[sekarang.getDay()]}, ${sekarang.getDate()} ${daftarBulan[sekarang.getMonth()]} ${sekarang.getFullYear()}`;
+                }
+
+                if (jamSekarang !== jamTerakhir) {
+                    updateLatarDinamis(jamSekarang);
+                    jamTerakhir = jamSekarang;
+                }
+            }
+            
+            function getIkonCuacaDariKode(kode) {
+                const kodeCuaca = parseInt(kode);
+                const petaKode={'Clear':[113],'Clouds':[116,119,122],'Rain':[176,263,266,281,284,293,296,299,302,305,308,311,314,353,356,359],'Drizzle':[263,266,281,284,293,296],'Thunderstorm':[200,386,389,392,395],'Snow':[179,182,185,227,230,323,326,329,332,335,338,368,371],'Mist':[143,248,260],};
+                let kondisi = Object.keys(petaKode).find(key => petaKode[key].includes(kodeCuaca)) || 'Mist';
+                const daftarIkon={'Clear':`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`,'Clouds':`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>`,'Rain':`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16" y1="13" x2="16" y2="21"></line><line x1="8" y1="13" x2="8" y2="21"></line><line x1="12" y1="15" x2="12" y2="23"></line><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path></svg>`,'Drizzle':`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="19" x2="8" y2="21"></line><line x1="12" y1="17" x2="12" y2="19"></line><line x1="16" y1="15" x2="16" y2="17"></line><path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"></path></svg>`,'Thunderstorm':`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16.82A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"></path><polyline points="13 11 9 17 15 17 11 23"></polyline></svg>`,'Snow':`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"></path><line x1="8" y1="16" x2="8" y2="16"></line><line x1="8" y1="20" x2="8" y2="20"></line><line x1="12" y1="18" x2="12" y2="18"></line><line x1="12" y1="22" x2="12" y2="22"></line><line x1="16" y1="16" x2="16" y2="16"></line><line x1="16" y1="20" x2="16" y2="20"></line></svg>`,'Mist':`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 18 0M3 12h18M7 12c0 2.76 2.24 5 5 5s5-2.24 5-5M7 12c0-2.76 2.24-5 5-5s5 2.24 5 5"/></svg>`,};
+                return daftarIkon[kondisi];
+            }
+
+            async function ambilDataCuaca(query) {
+                stateLoading.classList.remove('hidden');
+                stateKonten.classList.add('hidden');
+                stateError.classList.add('hidden');
+                
+                try {
+                    const respons = await fetch(`https://wttr.in/${encodeURIComponent(query)}?format=j1`);
+                    if (!respons.ok) throw new Error(`Data tidak ditemukan`);
+                    const data = await respons.json();
+                    
+                    const saatIni = data.current_condition[0];
+                    const area = data.nearest_area[0];
+                    
+                    kecepatanAnginRealtime = parseFloat(saatIni.windspeedKmph) || 0;
+
+                    elLokasi.textContent = area.areaName[0].value.split(',')[0];
+                    elSuhu.textContent = `${saatIni.temp_C}°C`;
+                    const deskripsiAsli = saatIni.weatherDesc[0].value;
+                    elDeskripsi.textContent = terjemahanCuaca[deskripsiAsli] || deskripsiAsli;
+                    elIkon.innerHTML = getIkonCuacaDariKode(saatIni.weatherCode);
+                    elTerasa.textContent = `Terasa: ${saatIni.FeelsLikeC}°C`;
+                    elKelembapan.textContent = `Kelembapan: ${saatIni.humidity}%`;
+                    
+                    const sekarang = new Date();
+                    const waktuUpdate = sekarang.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                    const intervalMenit = intervalUpdateCuaca / 60000;
+                    elStatusUpdate.textContent = `Update ${waktuUpdate} · Berikutnya ${intervalMenit} mnt`;
+                    
+                    querySaatIni = query;
+                    tampilkanKonten();
+                } catch (error) {
+                    tampilkanError(error.message);
+                }
+            }
+
+            function handleDapatkanLokasi() {
+                if (!navigator.geolocation) {
+                    tampilkanError("Browser tidak dukung lokasi.");
+                    return;
+                }
+                teksLoading.textContent = "Mencari lokasi...";
+                stateLoading.classList.remove('hidden');
+                stateKonten.classList.add('hidden');
+
+                navigator.geolocation.getCurrentPosition(
+                    (posisi) => {
+                        teksLoading.textContent = "Memuat data...";
+                        const { latitude, longitude } = posisi.coords;
+                        ambilDataCuaca(`${latitude},${longitude}`);
+                    },
+                    (error) => {
+                        let msg = "Gagal dapatkan lokasi.";
+                        if (error.code === 1) msg = "Izin lokasi ditolak.";
+                        tampilkanError(msg);
+                        ambilDataCuaca(kotaDefault);
+                        teksLoading.textContent = "Memuat data...";
+                    }
+                );
+            }
+
+            function tampilkanKonten() {
+                stateLoading.classList.add('hidden');
+                stateError.classList.add('hidden');
+                stateKonten.classList.remove('hidden');
+                stateKonten.classList.add('flex');
+            }
+
+            function tampilkanError(pesan) {
+                stateLoading.classList.add('hidden');
+                stateKonten.classList.add('hidden');
+                stateError.classList.remove('hidden');
+                pesanError.textContent = pesan;
+            }
+
+            // Inisialisasi widget
+            updateWaktu();
+            setInterval(updateWaktu, 1000);
+            
+            ambilDataCuaca(querySaatIni);
+            setInterval(() => ambilDataCuaca(querySaatIni), intervalUpdateCuaca);
+
+            tombolLokasi.addEventListener('click', handleDapatkanLokasi);
+
+            // ==================================================
+            // EFEK PARTIKEL KUNANG-KUNANG
+            // ==================================================
+            const canvas = document.getElementById('particle-canvas');
+            const ctx = canvas.getContext('2d');
+            let particlesArray;
+
+            // Objek untuk melacak posisi mouse
+            const mouse = {
+                x: null,
+                y: null,
+                radius: 80 // Radius pengaruh kursor
+            };
+
+            // Event listener dipindah ke elemen utama widget
+            elWidgetMain.addEventListener('mousemove', (event) => {
+                const rect = elWidgetMain.getBoundingClientRect();
+                mouse.x = event.clientX - rect.left;
+                mouse.y = event.clientY - rect.top;
+            });
+
+            elWidgetMain.addEventListener('mouseout', () => {
+                mouse.x = null;
+                mouse.y = null;
+            });
+
+
+            function resizeCanvas() {
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+            }
+            resizeCanvas();
+
+            class Particle {
+                constructor(x, y, directionX, directionY, size) {
+                    this.x = x;
+                    this.y = y;
+                    this.baseX = this.x; 
+                    this.baseY = this.y;
+                    this.directionX = directionX;
+                    this.directionY = directionY;
+                    this.size = size;
+                    this.opacity = Math.random() * 0.5 + 0.2;
+                    this.blinkSpeed = Math.random() * 0.03 + 0.005;
+                    this.blinkDirection = 1;
+                }
+
+                draw() {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = `rgba(255, 255, 180, ${this.opacity * 0.8})`;
+                    ctx.fillStyle = `rgba(255, 255, 180, ${this.opacity})`;
+                    ctx.fill();
+                }
+
+                update() {
+                    // --- Interaksi dengan Mouse ---
+                    if (mouse.x !== null && mouse.y !== null) {
+                        const dx = mouse.x - this.x;
+                        const dy = mouse.y - this.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < mouse.radius) {
+                            const force = (mouse.radius - distance) / mouse.radius;
+                            const accelerationX = (dx / distance) * force * 0.5;
+                            const accelerationY = (dy / distance) * force * 0.5;
+                            
+                            this.directionX += accelerationX;
+                            this.directionY += accelerationY;
+                        }
+                    }
+
+                    // Damping untuk memperlambat partikel secara bertahap
+                    this.directionX *= 0.96;
+                    this.directionY *= 0.96;
+
+
+                    // --- Pengaruh Angin dan Gerakan Dasar ---
+                    const windInfluence = kecepatanAnginRealtime / 20;
+                    this.x += this.directionX + windInfluence;
+                    this.y += this.directionY;
+
+                    // --- Logika Berkelip ---
+                    this.opacity += this.blinkSpeed * this.blinkDirection;
+                    if (this.opacity >= 1 || this.opacity <= 0.1) {
+                        this.blinkDirection *= -1;
+                    }
+                    this.opacity = Math.max(0.1, Math.min(1, this.opacity));
+
+                    // --- Memastikan Partikel Kembali ke Layar ---
+                    if (windInfluence >= 0 && this.x > canvas.width + this.size) {
+                        this.x = -this.size;
+                        this.y = Math.random() * canvas.height;
+                    } else if (windInfluence < 0 && this.x < -this.size) {
+                        this.x = canvas.width + this.size;
+                        this.y = Math.random() * canvas.height;
+                    }
+
+                    if (this.y > canvas.height + this.size) {
+                        this.y = -this.size;
+                        this.x = Math.random() * canvas.width;
+                    } else if (this.y < -this.size) {
+                        this.y = canvas.height + this.size;
+                        this.x = Math.random() * canvas.width;
+                    }
+
+                    this.draw();
+                }
+            }
+
+            function initParticles() {
+                particlesArray = [];
+                const numberOfParticles = (canvas.width * canvas.height) / 4000;
+                for (let i = 0; i < numberOfParticles; i++) {
+                    const size = Math.random() * 1.5 + 0.5;
+                    const x = Math.random() * canvas.width;
+                    const y = Math.random() * canvas.height;
+                    const directionX = (Math.random() * .2) - .1;
+                    const directionY = (Math.random() * .2) - .1;
+                    particlesArray.push(new Particle(x, y, directionX, directionY, size));
+                }
+            }
+
+            function animateParticles() {
+                requestAnimationFrame(animateParticles);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (let i = 0; i < particlesArray.length; i++) {
+                    particlesArray[i].update();
+                }
+            }
+
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                initParticles();
+            });
+
+            initParticles();
+            animateParticles();
+        });
+    </script>
+</body>
+</html>
+
