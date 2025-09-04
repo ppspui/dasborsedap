@@ -21,6 +21,7 @@
             align-items: center;
             min-height: 100vh;
             padding: 1rem;
+            margin: 0;
         }
         /* Style untuk container widget utama */
         .weather-widget {
@@ -139,7 +140,7 @@
             let kecepatanAnginRealtime = 0;
             
             // Variabel status cuaca untuk visualisasi
-            let isRaining = false;
+            let rainIntensity = 'none'; // 'none', 'light', 'moderate', 'heavy'
             let isThundering = false;
 
             const daftarHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -209,8 +210,19 @@
                     const deskripsiLower = deskripsiAsli.toLowerCase();
 
                     // Perbarui status cuaca untuk visualisasi
-                    isRaining = deskripsiLower.includes('rain') || deskripsiLower.includes('drizzle') || deskripsiLower.includes('shower');
                     isThundering = deskripsiLower.includes('thundery') || deskripsiLower.includes('thunderstorm');
+                    
+                    if (deskripsiLower.includes('rain') || deskripsiLower.includes('drizzle') || deskripsiLower.includes('shower')) {
+                        if (deskripsiLower.includes('heavy')) {
+                            rainIntensity = 'heavy';
+                        } else if (deskripsiLower.includes('moderate')) {
+                            rainIntensity = 'moderate';
+                        } else {
+                            rainIntensity = 'light';
+                        }
+                    } else {
+                        rainIntensity = 'none';
+                    }
                     
                     // Inisialisasi ulang partikel berdasarkan cuaca baru
                     initVisuals();
@@ -366,13 +378,30 @@
                 firefliesArray = [];
                 rainArray = [];
 
-                if (isRaining) {
-                    const numberOfDrops = 100;
+                if (rainIntensity !== 'none') {
+                    let numberOfDrops = 0;
+                    let baseSpeed = 0;
+                    let baseLength = 0;
+
+                    if (rainIntensity === 'heavy') {
+                        numberOfDrops = 150;
+                        baseSpeed = 6;
+                        baseLength = 15;
+                    } else if (rainIntensity === 'moderate') {
+                        numberOfDrops = 75;
+                        baseSpeed = 4;
+                        baseLength = 10;
+                    } else { // light
+                        numberOfDrops = 30;
+                        baseSpeed = 2;
+                        baseLength = 8;
+                    }
+
                     for (let i = 0; i < numberOfDrops; i++) {
                         const x = Math.random() * canvas.width;
                         const y = Math.random() * canvas.height;
-                        const speed = Math.random() * 5 + 2;
-                        const length = Math.random() * 15 + 5;
+                        const speed = Math.random() * 2 + baseSpeed;
+                        const length = Math.random() * 5 + baseLength;
                         rainArray.push(new RainDrop(x, y, speed, length));
                     }
                 } else {
@@ -416,4 +445,5 @@
     </script>
 </body>
 </html>
+
 
