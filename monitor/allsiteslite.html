@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="900"> <!-- Refresh halaman setiap 15 menit -->
+    <meta http-equiv="refresh" content="600"> <!-- Refresh halaman setiap 10 menit -->
     <title>Dasbor Monitoring Situs (Iframe Scaled)</title>
     <!-- Memuat Tailwind CSS untuk styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -57,9 +57,9 @@
     <div class="container mx-auto p-2">
         <!-- Header Halaman -->
         <header class="text-center my-4 text-gray-400 text-sm">
-             <p>
-                Auto-refresh dalam: <span id="countdown-timer" class="font-bold">30</span> detik.
-            </p>
+              <p>
+                  Auto-refresh dalam: <span id="countdown-timer" class="font-bold">30</span> detik.
+              </p>
         </header>
 
         <!-- Bagian untuk Kategori Layanan -->
@@ -193,7 +193,7 @@
                     if (!isLoaded) {
                          // Hanya tampilkan timeout jika status awal OK
                         if (!ui.card.classList.contains('card-alert')) {
-                             setFailureState('iframe timeout');
+                             // setFailureState('iframe timeout'); // Dinonaktifkan agar tidak menampilkan error timeout
                         }
                         ui.loader.style.display = 'none';
                     }
