@@ -1,53 +1,6 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Widget Cuaca Real-time</title>
-    <!-- Memuat Tailwind CSS untuk styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Memuat Google Fonts: Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-    <style>
-        /* Mengatur font default dan tampilan dasar */
-        body {
-            font-family: 'Inter', sans-serif;
-            /* Latar belakang ini hanya untuk demo, tidak akan terlihat saat di-embed */
-            background: linear-gradient(135deg, #4a90e2 0%, #0e3a6e 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 1rem;
-        }
-        /* Style untuk container widget utama */
-        .weather-widget {
-            /* Transisi untuk perubahan warna yang mulus */
-            transition: background 1.5s ease-in-out;
-            user-select: none;
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-        }
-        #get-location-btn:hover svg {
-            stroke: #fff;
-        }
-    </style>
-</head>
-<body>
-    <!-- 
-      ===============================================================
-      KODE WIDGET DIMULAI DI SINI
-      Salin semua kode dari <div id="weather-widget-container"> ... </div>
-      dan tempelkan di situs web Anda.
-      Ukuran widget bisa diubah langsung di "style" di bawah ini.
-      ===============================================================
-    -->
-    <div id="weather-widget-container" style="width: 380px; height: 120px;">
+<div id="weather-widget-container" style="width: 380px; height: 120px;">
         <div id="widget-main" class="weather-widget relative overflow-hidden backdrop-blur-lg p-3 rounded-xl shadow-2xl text-white border border-white/10 flex flex-col justify-between h-full">
-            <!-- Canvas untuk efek partikel kunang-kunang -->
+            <!-- Canvas untuk efek partikel -->
             <canvas id="particle-canvas" class="absolute top-0 left-0 w-full h-full z-0"></canvas>
             
             <!-- Menampilkan pesan loading awal -->
@@ -136,8 +89,12 @@
 
             let querySaatIni = kotaDefault;
             let jamTerakhir = -1;
-            let kecepatanAnginRealtime = 0; // Variabel untuk menyimpan kecepatan angin
+            let kecepatanAnginRealtime = 0;
             
+            // Variabel status cuaca untuk visualisasi
+            let isRaining = false;
+            let isThundering = false;
+
             const daftarHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
             const daftarBulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
             const terjemahanCuaca = { "Sunny": "Cerah", "Partly cloudy": "Berawan Sebagian", "Cloudy": "Berawan", "Overcast": "Mendung", "Mist": "Berkabut", "Patchy rain possible": "Mungkin Hujan", "Thundery outbreaks possible": "Potensi Petir", "Fog": "Kabut", "Light rain": "Hujan Ringan", "Moderate rain": "Hujan Sedang", "Heavy rain": "Hujan Lebat", "Light rain shower": "Gerimis", "Clear": "Cerah" };
@@ -200,10 +157,19 @@
                     const area = data.nearest_area[0];
                     
                     kecepatanAnginRealtime = parseFloat(saatIni.windspeedKmph) || 0;
+                    
+                    const deskripsiAsli = saatIni.weatherDesc[0].value;
+                    const deskripsiLower = deskripsiAsli.toLowerCase();
+
+                    // Perbarui status cuaca untuk visualisasi
+                    isRaining = deskripsiLower.includes('rain') || deskripsiLower.includes('drizzle') || deskripsiLower.includes('shower');
+                    isThundering = deskripsiLower.includes('thundery') || deskripsiLower.includes('thunderstorm');
+                    
+                    // Inisialisasi ulang partikel berdasarkan cuaca baru
+                    initVisuals();
 
                     elLokasi.textContent = area.areaName[0].value.split(',')[0];
                     elSuhu.textContent = `${saatIni.temp_C}°C`;
-                    const deskripsiAsli = saatIni.weatherDesc[0].value;
                     elDeskripsi.textContent = terjemahanCuaca[deskripsiAsli] || deskripsiAsli;
                     elIkon.innerHTML = getIkonCuacaDariKode(saatIni.weatherCode);
                     elTerasa.textContent = `Terasa: ${saatIni.FeelsLikeC}°C`;
@@ -270,31 +236,26 @@
             tombolLokasi.addEventListener('click', handleDapatkanLokasi);
 
             // ==================================================
-            // EFEK PARTIKEL KUNANG-KUNANG
+            // EFEK VISUAL KANVAS
             // ==================================================
             const canvas = document.getElementById('particle-canvas');
             const ctx = canvas.getContext('2d');
-            let particlesArray;
+            let firefliesArray = [];
+            let rainArray = [];
+            let lightningOpacity = 0;
+            let nextLightningTime = 0;
 
-            // Objek untuk melacak posisi mouse
-            const mouse = {
-                x: null,
-                y: null,
-                radius: 80 // Radius pengaruh kursor
-            };
+            const mouse = { x: null, y: null, radius: 80 };
 
-            // Event listener dipindah ke elemen utama widget
             elWidgetMain.addEventListener('mousemove', (event) => {
                 const rect = elWidgetMain.getBoundingClientRect();
                 mouse.x = event.clientX - rect.left;
                 mouse.y = event.clientY - rect.top;
             });
-
             elWidgetMain.addEventListener('mouseout', () => {
                 mouse.x = null;
                 mouse.y = null;
             });
-
 
             function resizeCanvas() {
                 canvas.width = canvas.offsetWidth;
@@ -302,114 +263,107 @@
             }
             resizeCanvas();
 
-            class Particle {
+            class Firefly {
                 constructor(x, y, directionX, directionY, size) {
-                    this.x = x;
-                    this.y = y;
-                    this.baseX = this.x; 
-                    this.baseY = this.y;
-                    this.directionX = directionX;
-                    this.directionY = directionY;
-                    this.size = size;
-                    this.opacity = Math.random() * 0.5 + 0.2;
-                    this.blinkSpeed = Math.random() * 0.03 + 0.005;
-                    this.blinkDirection = 1;
+                    this.x = x; this.y = y; this.directionX = directionX; this.directionY = directionY; this.size = size;
+                    this.opacity = Math.random() * 0.5 + 0.2; this.blinkSpeed = Math.random() * 0.03 + 0.005; this.blinkDirection = 1;
                 }
-
                 draw() {
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
-                    ctx.shadowBlur = 8;
-                    ctx.shadowColor = `rgba(255, 255, 180, ${this.opacity * 0.8})`;
-                    ctx.fillStyle = `rgba(255, 255, 180, ${this.opacity})`;
-                    ctx.fill();
+                    ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
+                    ctx.shadowBlur = 8; ctx.shadowColor = `rgba(255, 255, 180, ${this.opacity * 0.8})`;
+                    ctx.fillStyle = `rgba(255, 255, 180, ${this.opacity})`; ctx.fill();
                 }
-
                 update() {
-                    // --- Interaksi dengan Mouse ---
-                    if (mouse.x !== null && mouse.y !== null) {
-                        const dx = mouse.x - this.x;
-                        const dy = mouse.y - this.y;
+                    if (mouse.x !== null) {
+                        const dx = mouse.x - this.x; const dy = mouse.y - this.y;
                         const distance = Math.sqrt(dx * dx + dy * dy);
-
                         if (distance < mouse.radius) {
                             const force = (mouse.radius - distance) / mouse.radius;
-                            const accelerationX = (dx / distance) * force * 0.5;
-                            const accelerationY = (dy / distance) * force * 0.5;
-                            
-                            this.directionX += accelerationX;
-                            this.directionY += accelerationY;
+                            this.directionX += (dx / distance) * force * 0.5;
+                            this.directionY += (dy / distance) * force * 0.5;
                         }
                     }
-
-                    // Damping untuk memperlambat partikel secara bertahap
-                    this.directionX *= 0.96;
-                    this.directionY *= 0.96;
-
-
-                    // --- Pengaruh Angin dan Gerakan Dasar ---
-                    const windInfluence = kecepatanAnginRealtime / 20;
-                    this.x += this.directionX + windInfluence;
-                    this.y += this.directionY;
-
-                    // --- Logika Berkelip ---
+                    this.directionX *= 0.96; this.directionY *= 0.96;
+                    this.x += this.directionX + (kecepatanAnginRealtime / 20); this.y += this.directionY;
                     this.opacity += this.blinkSpeed * this.blinkDirection;
-                    if (this.opacity >= 1 || this.opacity <= 0.1) {
-                        this.blinkDirection *= -1;
-                    }
+                    if (this.opacity >= 1 || this.opacity <= 0.1) { this.blinkDirection *= -1; }
                     this.opacity = Math.max(0.1, Math.min(1, this.opacity));
-
-                    // --- Memastikan Partikel Kembali ke Layar ---
-                    if (windInfluence >= 0 && this.x > canvas.width + this.size) {
-                        this.x = -this.size;
-                        this.y = Math.random() * canvas.height;
-                    } else if (windInfluence < 0 && this.x < -this.size) {
-                        this.x = canvas.width + this.size;
-                        this.y = Math.random() * canvas.height;
-                    }
-
-                    if (this.y > canvas.height + this.size) {
-                        this.y = -this.size;
-                        this.x = Math.random() * canvas.width;
-                    } else if (this.y < -this.size) {
-                        this.y = canvas.height + this.size;
-                        this.x = Math.random() * canvas.width;
-                    }
-
+                    if (this.x > canvas.width + this.size) this.x = -this.size;
+                    if (this.x < -this.size) this.x = canvas.width + this.size;
+                    if (this.y > canvas.height + this.size) this.y = -this.size;
+                    if (this.y < -this.size) this.y = canvas.height + this.size;
                     this.draw();
                 }
             }
+            
+            class RainDrop {
+                constructor(x, y, speed, length) {
+                    this.x = x; this.y = y; this.speed = speed; this.length = length;
+                }
+                draw() {
+                    ctx.beginPath(); ctx.moveTo(this.x, this.y);
+                    ctx.lineTo(this.x, this.y + this.length);
+                    ctx.strokeStyle = 'rgba(174,194,224,0.5)'; ctx.lineWidth = 1; ctx.stroke();
+                }
+                update() {
+                    this.y += this.speed + (kecepatanAnginRealtime / 4);
+                    if (this.y > canvas.height) {
+                        this.y = Math.random() * -100 - this.length;
+                        this.x = Math.random() * canvas.width;
+                    }
+                    this.draw();
+                }
+            }
+            
+            function initVisuals() {
+                firefliesArray = [];
+                rainArray = [];
 
-            function initParticles() {
-                particlesArray = [];
-                const numberOfParticles = (canvas.width * canvas.height) / 4000;
-                for (let i = 0; i < numberOfParticles; i++) {
-                    const size = Math.random() * 1.5 + 0.5;
-                    const x = Math.random() * canvas.width;
-                    const y = Math.random() * canvas.height;
-                    const directionX = (Math.random() * .2) - .1;
-                    const directionY = (Math.random() * .2) - .1;
-                    particlesArray.push(new Particle(x, y, directionX, directionY, size));
+                if (isRaining) {
+                    const numberOfDrops = 100;
+                    for (let i = 0; i < numberOfDrops; i++) {
+                        const x = Math.random() * canvas.width;
+                        const y = Math.random() * canvas.height;
+                        const speed = Math.random() * 5 + 2;
+                        const length = Math.random() * 15 + 5;
+                        rainArray.push(new RainDrop(x, y, speed, length));
+                    }
+                } else {
+                    const numberOfParticles = (canvas.width * canvas.height) / 4000;
+                    for (let i = 0; i < numberOfParticles; i++) {
+                        const size = Math.random() * 1.5 + 0.5;
+                        const x = Math.random() * canvas.width; const y = Math.random() * canvas.height;
+                        const directionX = (Math.random() * .2) - .1; const directionY = (Math.random() * .2) - .1;
+                        firefliesArray.push(new Firefly(x, y, directionX, directionY, size));
+                    }
                 }
             }
 
-            function animateParticles() {
-                requestAnimationFrame(animateParticles);
+            function animate() {
+                requestAnimationFrame(animate);
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                for (let i = 0; i < particlesArray.length; i++) {
-                    particlesArray[i].update();
+                
+                firefliesArray.forEach(p => p.update());
+                rainArray.forEach(r => r.update());
+
+                // Efek petir
+                if (isThundering && Date.now() > nextLightningTime) {
+                    lightningOpacity = Math.random() * 0.6 + 0.2; // Intensitas kilat
+                    nextLightningTime = Date.now() + Math.random() * 8000 + 4000; // Waktu kilat berikutnya
+                }
+                if (lightningOpacity > 0) {
+                    ctx.fillStyle = `rgba(255, 255, 255, ${lightningOpacity})`;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    lightningOpacity -= 0.04; // Kecepatan pudar
                 }
             }
 
             window.addEventListener('resize', () => {
                 resizeCanvas();
-                initParticles();
+                initVisuals();
             });
 
-            initParticles();
-            animateParticles();
+            initVisuals();
+            animate();
         });
     </script>
-</body>
-</html>
-
