@@ -51,7 +51,8 @@
             try {
                 const response = await fetch(API_ENDPOINT);
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorData = await response.json();
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorData.details || errorData.error}`);
                 }
                 const data = await response.json();
                 updateWidget(data);
