@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime Visitor Widget</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: transparent; /* Makes iframe background transparent */
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-transparent">
+
+    <div class="bg-white p-6 rounded-2xl shadow-lg w-full max-w-xs mx-auto border border-gray-200">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2">
+                <span class="relative flex h-3 w-3">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                </span>
+                <p class="text-sm font-medium text-gray-600">Live</p>
+            </div>
+            <!-- Google Analytics Icon -->
+            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+        </div>
+        
+        <div>
+            <p id="visitor-count" class="text-5xl font-bold text-gray-800 text-center transition-all duration-300">
+                ...
+            </p>
+            <p class="text-center text-gray-500 text-sm mt-1">Pengguna Online Saat Ini</p>
+        </div>
+
+        <div class="mt-4 border-t border-gray-100 pt-3">
+            <p id="last-updated" class="text-xs text-center text-gray-400">Memuat data...</p>
+        </div>
+    </div>
+
+    <script>
+        const visitorCountElement = document.getElementById('visitor-count');
+        const lastUpdatedElement = document.getElementById('last-updated');
+
+        // URL ini sudah mengarah ke Cloud Function Anda
+        const API_ENDPOINT = 'https://get-realtime-visitors-695065982410.asia-southeast2.run.app/'; 
+
+        async function fetchRealtimeUsers() {
+            try {
+                const response = await fetch(API_ENDPOINT);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                updateWidget(data);
+            } catch (error) {
+                console.error('Gagal mengambil data visitor:', error);
+                visitorCountElement.textContent = 'Error';
+                lastUpdatedElement.textContent = 'Gagal memuat. Periksa konsol.';
+            }
+        }
+        
+        function updateWidget(data) {
+            // Animasi sederhana untuk perubahan angka
+            visitorCountElement.classList.add('opacity-0', '-translate-y-2');
+            
+            setTimeout(() => {
+                visitorCountElement.textContent = data.activeUsers || 0;
+                visitorCountElement.classList.remove('opacity-0', '-translate-y-2');
+            }, 200);
+
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            lastUpdatedElement.textContent = `Diperbarui: ${timeString}`;
+        }
+
+        // Panggil fungsi pertama kali saat halaman dimuat
+        fetchRealtimeUsers();
+
+        // Atur interval untuk mengambil data setiap 30 detik (30000 ms)
+        setInterval(fetchRealtimeUsers, 30000);
+    </script>
+
+</body>
+</html>
+
