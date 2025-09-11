@@ -1,30 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="300"> <!-- Refresh the whole page every 5 minutes -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>University Services Links</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter font from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* A light gray background */
+        }
+        .histats-image {
+            transform: rotate(-90deg); /* Rotate image 90 degrees counter-clockwise */
+            filter: brightness(1.1) saturate(1.2); /* Make the image brighter and more colorful */
+        }
+        
+        /* Shine effect container */
+        .shine-effect {
+            position: relative;
+            overflow: hidden; /* This clips the shine effect */
+            display: flex; /* Use flexbox to center the image */
+            justify-content: center;
+            align-items: center;
+            /* Make the container large enough for the rotated image */
+            width: 80px;
+            height: 80px;
+        }
 
-<meta http-equiv="refresh" content="30">
-<div>
-<a href="http://emas3.ui.ac.id" target="_blank">Emas3</a><a href="https://www.histats.com/viewstats/?SID=4919902&f=2" alt="" target="_blank" ><div id="histatsC"><img border="0" src="//s4is.histats.com/stats/i/4919902.gif?4919902&103"></div></a>
-</div>
-<div>
-<a href="http://emas2.ui.ac.id" target="_blank">Emas2</a><a href="https://www.histats.com/viewstats/?SID=4463105&f=2" alt="" target="_blank" ><div id="histatsC"><img border="0" src="//s4is.histats.com/stats/i/4463105.gif?4463105&103"></div></a>
-</div>
-<div>
-<a href="http://emas.ui.ac.id" target="_blank">Emas1</a><a href="https://www.histats.com/viewstats/?SID=4387649&f=2" alt="" target="_blank" ><div id="histatsC"><img border="0" src="//s4is.histats.com/stats/i/4387649.gif?4387649&103"></div></a>
-</div>
-<div>
-<a href="http://idol2.ui.ac.id" target="_blank">Idols2</a><a href="https://www.histats.com/viewstats/?SID=4919907&f=2" alt="" target="_blank" ><div id="histatsC"><img border="0" src="https://s4is.histats.com/stats/i/4919907.gif?4919907&103"></div></a>
-</div>
-<div>
-<a href="http://idols.ui.ac.id" target="_blank">Idols1</a><a href="https://www.histats.com/viewstats/?SID=4571073&f=2" alt="" target="_blank" ><div id="histatsC"><img border="0" src="//s4is.histats.com/stats/i/4571073.gif?4571073&103"></div></a>
-</div>
-<div>
-<a href="http://scele.ui.ac.id" target="_blank">Scele</a><a href="https://www.histats.com/viewstats/?SID=4417875&f=2" alt="" target="_blank" ><div id="histatsC"><img border="0" src="//s4is.histats.com/stats/i/4417875.gif?4417875&103"></div></a>
-</div>
-<div>
-<a href="http://ocw.ui.ac.id" target="_blank">OCW</a><a href="https://www.histats.com/viewstats/?SID=4590850&f=2" alt="" target="_blank" ><div id="histatsC"><img border="0" src="//s4is.histats.com/stats/i/4590850.gif?4590850&103"></div></a>
-</div>
-<div>
-<a href="http://ovis.ui.ac.id" target="_blank">Ovis</a><a href="https://www.histats.com/viewstats/?SID=4590850&f=2" alt="" target="_blank" ><div id="histatsC"><img border="0" src="//s4is.histats.com/stats/i/4590857.gif?4590857&103"></div></a>
-</div>
-<div>
-<a href="http://dpasdp.ui.ac.id" target="_blank">dpasdp</a><a href="https://www.histats.com/viewstats/?SID=4590869&f=2" alt="" target="_blank" ><div id="histatsC"><img border="0" src="//s4is.histats.com/stats/i/4590869.gif?4590869&103"></div></a>
-</div>
-<a href="http://pjj.ui.ac.id" target="_blank">pjj</a><a href="https://www.histats.com/viewstats/?SID=4381608&f=2" alt="" target="_blank" ><div id="histatsC"><img border="0" src="//s4is.histats.com/stats/i/4381608.gif?4381608&103"></div></a>
+        /* The shine pseudo-element */
+        .shine-effect::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: -150%; /* Start off-screen at the top */
+            width: 100%;
+            height: 50%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255, 255, 255, 0) 0%,
+                rgba(255, 255, 255, 0.4) 50%,
+                rgba(255, 255, 255, 0) 100%
+            );
+            transform: skewY(-25deg); /* Angle the shine */
+            transition: top 0.7s ease-in-out;
+        }
+
+        /* Trigger the animation on hover */
+        .shine-effect:hover::after {
+            top: 150%; /* Move it down across the element */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-sm mx-auto bg-white p-6 rounded-lg shadow-md">
+        <!-- The list will be dynamically generated here -->
+        <div id="service-list" class="space-y-2">
+            <!-- Content is generated by JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Array of service objects. Edit this to add, remove, or change services.
+            const services = [
+                {
+                    name: 'EMAS3',
+                    url: 'https://emas3.ui.ac.id',
+                    statsUrl: 'https://www.histats.com/viewstats/?SID=4919902&f=2',
+                    statsImgSrc: 'https://s4is.histats.com/stats/i/4919902.gif?4919902&103'
+                },
+                {
+                    name: 'EMAS2',
+                    url: 'https://emas2.ui.ac.id',
+                    statsUrl: 'https://www.histats.com/viewstats/?SID=4463105&f=2',
+                    statsImgSrc: 'https://s4is.histats.com/stats/i/4463105.gif?4463105&103'
+                },
+                {
+                    name: 'IDOLS2',
+                    url: 'https://idol2.ui.ac.id',
+                    statsUrl: 'https://www.histats.com/viewstats/?SID=4919907&f=2',
+                    statsImgSrc: 'https://s4is.histats.com/stats/i/4919907.gif?4919907&103'
+                },
+                {
+                    name: 'IDOLS1',
+                    url: 'https://idols.ui.ac.id',
+                    statsUrl: 'https://www.histats.com/viewstats/?SID=4975946&f=2',
+                    statsImgSrc: 'https://s4is.histats.com/stats/i/4975946.gif?4975946&103'
+                },
+                {
+                    name: 'OCW',
+                    url: 'https://ocw.ui.ac.id',
+                    statsUrl: 'https://www.histats.com/viewstats/?SID=4590850&f=2',
+                    statsImgSrc: 'https://s4is.histats.com/stats/i/4590850.gif?4590850&103'
+                },
+                {
+                    name: 'OVIS',
+                    url: 'https://ovis.ui.ac.id',
+                    statsUrl: 'https://www.histats.com/viewstats/?SID=4590850&f=2',
+                    statsImgSrc: 'https://s4is.histats.com/stats/i/4590857.gif?4590857&103'
+                },
+                {
+                    name: 'DPPD',
+                    url: 'https://dpasdp.ui.ac.id',
+                    statsUrl: 'https://www.histats.com/viewstats/?SID=4590869&f=2',
+                    statsImgSrc: 'https://s4is.histats.com/stats/i/4590869.gif?4590869&103'
+                },
+                {
+                    name: 'PJJ',
+                    url: 'https://pjj.ui.ac.id',
+                    statsUrl: 'https://www.histats.com/viewstats/?SID=4381608&f=2',
+                    statsImgSrc: 'https://s4is.histats.com/stats/i/4381608.gif?4381608&103'
+                }
+            ];
+
+            const serviceListContainer = document.getElementById('service-list');
+
+            // Generate the HTML for each service from the array
+            services.forEach(service => {
+                const serviceDiv = document.createElement('div');
+                serviceDiv.className = 'flex flex-col items-center';
+                
+                serviceDiv.innerHTML = `
+                    <a href="${service.url}" target="_blank" class="text-base font-extrabold text-indigo-600 hover:text-indigo-800">${service.name}</a>
+                    <a href="${service.statsUrl}" alt="${service.name} Stats" target="_blank" class="shine-effect -mt-4">
+                        <img border="0" src="${service.statsImgSrc}" alt="${service.name} Stats Image" class="histats-image absolute transition-opacity duration-500 ease-in-out opacity-100">
+                        <img border="0" src="${service.statsImgSrc}" alt="${service.name} Stats Image" class="histats-image absolute transition-opacity duration-500 ease-in-out opacity-0">
+                    </a>
+                `;
+                serviceListContainer.appendChild(serviceDiv);
+            });
+
+            // This function will reload the histats images every 10 seconds with a crossfade effect.
+            function refreshStatImages() {
+                const imageContainers = document.querySelectorAll('.shine-effect');
+
+                imageContainers.forEach(container => {
+                    const visibleImg = container.querySelector('.opacity-100');
+                    const hiddenImg = container.querySelector('.opacity-0');
+
+                    if (!visibleImg || !hiddenImg) return;
+
+                    // Prepare the new source for the hidden image
+                    let originalSrc = hiddenImg.src;
+                    originalSrc = originalSrc.replace(/&?_cb=\d+/, '');
+                    
+                    if (originalSrc.includes('?')) {
+                        hiddenImg.src = `${originalSrc}&_cb=${new Date().getTime()}`;
+                    } else {
+                        hiddenImg.src = `${originalSrc}?_cb=${new Date().getTime()}`;
+                    }
+
+                    // Once the new image is loaded in the background, start the crossfade
+                    hiddenImg.onload = () => {
+                        visibleImg.classList.remove('opacity-100');
+                        visibleImg.classList.add('opacity-0');
+                        
+                        hiddenImg.classList.remove('opacity-0');
+                        hiddenImg.classList.add('opacity-100');
+                    };
+                });
+            }
+
+            // Set the interval to call the refresh function every 10 seconds (10000 milliseconds)
+            setInterval(refreshStatImages, 10000);
+        });
+    </script>
+
+</body>
+</html>
+
+
