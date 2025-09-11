@@ -19,12 +19,12 @@
         .histats-image {
             transform: rotate(-90deg); /* Rotate image 90 degrees counter-clockwise */
             filter: brightness(1.1) saturate(1.2); /* Make the image brighter and more colorful */
+            transition: filter 0.3s ease-in-out; /* Smooth transition for the hover effect */
         }
         
-        /* Shine effect container */
-        .shine-effect {
+        /* Image container */
+        .image-container {
             position: relative;
-            overflow: hidden; /* This clips the shine effect */
             display: flex; /* Use flexbox to center the image */
             justify-content: center;
             align-items: center;
@@ -33,28 +33,11 @@
             height: 80px;
         }
 
-        /* The shine pseudo-element */
-        .shine-effect::after {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: -150%; /* Start off-screen at the top */
-            width: 100%;
-            height: 50%;
-            background: linear-gradient(
-                to bottom,
-                rgba(255, 255, 255, 0) 0%,
-                rgba(255, 255, 255, 0.4) 50%,
-                rgba(255, 255, 255, 0) 100%
-            );
-            transform: skewY(-25deg); /* Angle the shine */
-            transition: top 0.7s ease-in-out;
+        /* Apply hue-rotate effect on hover */
+        .image-container:hover .histats-image {
+            filter: brightness(1.1) saturate(1.2) hue-rotate(45deg);
         }
 
-        /* Trigger the animation on hover */
-        .shine-effect:hover::after {
-            top: 150%; /* Move it down across the element */
-        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
@@ -129,7 +112,7 @@
                 
                 serviceDiv.innerHTML = `
                     <a href="${service.url}" target="_blank" class="text-base font-extrabold text-indigo-600 hover:text-indigo-800">${service.name}</a>
-                    <a href="${service.statsUrl}" alt="${service.name} Stats" target="_blank" class="shine-effect -mt-4">
+                    <a href="${service.statsUrl}" alt="${service.name} Stats" target="_blank" class="image-container -mt-4">
                         <img border="0" src="${service.statsImgSrc}" alt="${service.name} Stats Image" class="histats-image absolute transition-opacity duration-500 ease-in-out opacity-100">
                         <img border="0" src="${service.statsImgSrc}" alt="${service.name} Stats Image" class="histats-image absolute transition-opacity duration-500 ease-in-out opacity-0">
                     </a>
@@ -139,7 +122,7 @@
 
             // This function will reload the histats images every 10 seconds with a crossfade effect.
             function refreshStatImages() {
-                const imageContainers = document.querySelectorAll('.shine-effect');
+                const imageContainers = document.querySelectorAll('.image-container');
 
                 imageContainers.forEach(container => {
                     const visibleImg = container.querySelector('.opacity-100');
