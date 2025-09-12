@@ -25,12 +25,12 @@
         let map;
 
         function initMap() {
-            // Inisialisasi peta di koordinat pusat Universitas Indonesia, Depok
-            const myLocation = { lat: -6.3601, lng: 106.8306 }; 
+            // Inisialisasi peta di koordinat yang baru
+            const myLocation = { lat: -6.365975, lng: 106.826663 }; 
 
             map = new google.maps.Map(document.getElementById("map"), {
                 center: myLocation,
-                zoom: 15, // Tingkat zoom yang lebih dekat
+                zoom: 17, // Tingkat zoom telah dinaikkan
             });
 
             // Buat instance TrafficLayer
