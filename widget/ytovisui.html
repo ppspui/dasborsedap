@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Widget Video OVISUIchannel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container {
+            width: 100%;
+            max-width: 48rem;
+            background-color: #ffffff;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            padding: 2rem;
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+        .video-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .video-thumbnail {
+            width: 100%;
+            height: auto;
+            overflow: hidden;
+            border-radius: 0.75rem;
+        }
+        .video-thumbnail img {
+            width: 100%;
+            height: auto;
+            display: block;
+            object-fit: cover;
+            transform: scale(1.05);
+            transition: transform 0.3s ease;
+        }
+        .video-thumbnail img:hover {
+            transform: scale(1.1);
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .tab-button {
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            background-color: #f3f4f6;
+            transition: background-color 0.3s ease;
+        }
+        .tab-button.active {
+            background-color: #e5e7eb;
+        }
+        .tab-button:hover {
+            background-color: #d1d5db;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Video Terbaru dari OVISUIchannel</h1>
+
+    <div class="flex gap-2 mb-6">
+        <button class="tab-button active" data-sort="date">Latest</button>
+        <button class="tab-button" data-sort="viewCount">Most Popular</button>
+    </div>
+
+    <div id="video-list" class="video-grid">
+        <!-- Video items will be dynamically inserted here -->
+        <div class="text-center py-8 text-gray-500">
+            <p id="loading-message">Memuat video...</p>
+        </div>
+    </div>
+    <div id="loader-container" class="mt-4 text-center"></div>
+</div>
+
+<script>
+    const apiKey = 'AIzaSyBQwTwAPeVIWTvoqpnGLnA1-haitl5grr8';
+    const channelId = 'UCPJH3LDK8yzvxUEzyI-ftaA';
+
+    const videoListContainer = document.getElementById('video-list');
+    const loaderContainer = document.getElementById('loader-container');
+    const tabButtons = document.querySelectorAll('.tab-button');
+
+    let nextPageToken = null;
+    let isLoading = false;
+    let currentSort = 'date';
+    
+    function displayStatus(message) {
+        videoListContainer.innerHTML = `
+            <div class="text-center py-8 text-gray-500 col-span-full">
+                <p>${message}</p>
+            </div>
+        `;
+    }
+
+    function showLoadingIndicator() {
+        loaderContainer.innerHTML = `<div class="loader mx-auto"></div>`;
+    }
+
+    function hideLoadingIndicator() {
+        loaderContainer.innerHTML = '';
+    }
+
+    function formatNumber(num) {
+        if (!num) return '0';
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(1) + 'M';
+        } else if (num >= 1000) {
+            return (num / 1000).toFixed(1) + 'K';
+        }
+        return num;
+    }
+
+    function timeAgo(date) {
+        const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+        let interval = seconds / 31536000;
+        if (interval > 1) {
+            return Math.floor(interval) + ' tahun';
+        }
+        interval = seconds / 2592000;
+        if (interval > 1) {
+            return Math.floor(interval) + ' bulan';
+        }
+        interval = seconds / 86400;
+        if (interval > 1) {
+            return Math.floor(interval) + ' hari';
+        }
+        interval = seconds / 3600;
+        if (interval > 1) {
+            return Math.floor(interval) + ' jam';
+        }
+        interval = seconds / 60;
+        if (interval > 1) {
+            return Math.floor(interval) + ' menit';
+        }
+        return Math.floor(seconds) + ' detik';
+    }
+
+    function createVideoElement(video) {
+        const videoElement = document.createElement('div');
+        videoElement.className = 'video-item';
+
+        let statsHtml = '';
+        if (video.views) {
+            statsHtml += `<span class="flex items-center gap-1"><i class="fas fa-eye"></i>${formatNumber(video.views)}</span>`;
+        }
+        if (video.likes) {
+            statsHtml += `<span class="flex items-center gap-1"><i class="fas fa-thumbs-up"></i>${formatNumber(video.likes)}</span>`;
+        }
+        if (video.commentCount) {
+            statsHtml += `<span class="flex items-center gap-1"><i class="fas fa-comment"></i>${formatNumber(video.commentCount)}</span>`;
+        }
+        if (video.publishedAt) {
+            statsHtml += `<span class="ml-auto">${timeAgo(video.publishedAt)} lalu</span>`;
+        }
+
+        videoElement.innerHTML = `
+            <div class="video-thumbnail">
+                <a href="https://www.youtube.com/watch?v=${video.id}" target="_blank" rel="noopener noreferrer">
+                    <img src="${video.thumbnail}" alt="Thumbnail video" class="w-full h-auto" loading="lazy">
+                </a>
+            </div>
+            <div class="flex-grow">
+                <a href="https://www.youtube.com/watch?v=${video.id}" target="_blank" rel="noopener noreferrer" class="hover:underline">
+                    <h2 class="text-sm font-semibold text-gray-800 line-clamp-2">${video.title}</h2>
+                </a>
+                <p class="text-gray-500 text-xs mt-1 flex items-center gap-2">
+                    ${statsHtml}
+                </p>
+            </div>
+        `;
+        return videoElement;
+    }
+
+    function renderVideos(videos) {
+        const existingStatusMessage = videoListContainer.querySelector('.text-center');
+        if (existingStatusMessage) {
+            existingStatusMessage.remove();
+        }
+
+        videos.forEach(video => {
+            const videoElement = createVideoElement(video);
+            videoListContainer.appendChild(videoElement);
+        });
+    }
+    
+    async function fetchVideos(sortOrder, pageToken = '') {
+        if (isLoading) {
+            return;
+        }
+        isLoading = true;
+        
+        if (pageToken === '') {
+            displayStatus('Memuat video...');
+            videoListContainer.innerHTML = ''; // Clear existing videos on new sort
+        }
+        
+        showLoadingIndicator();
+
+        if (apiKey === 'YOUR_YOUTUBE_API_KEY') {
+            displayStatus('Harap masukkan kunci API YouTube Anda di dalam kode.');
+            hideLoadingIndicator();
+            isLoading = false;
+            return;
+        }
+
+        const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&order=${sortOrder}&maxResults=10&key=${apiKey}&type=video&pageToken=${pageToken}`;
+        
+        try {
+            const searchResponse = await fetch(searchUrl);
+            if (!searchResponse.ok) {
+                throw new Error(`HTTP error! status: ${searchResponse.status}`);
+            }
+            const searchData = await searchResponse.json();
+            
+            nextPageToken = searchData.nextPageToken || null;
+            
+            let videos = searchData.items.map(item => ({
+                id: item.id.videoId,
+                title: item.snippet.title,
+                thumbnail: item.snippet.thumbnails.high.url,
+                publishedAt: item.snippet.publishedAt
+            }));
+
+
+            if (videos.length === 0 && !videoListContainer.hasChildNodes()) {
+                displayStatus('Tidak ada video yang ditemukan.');
+                return;
+            }
+
+            const videoIds = videos.map(v => v.id).join(',');
+            const statsUrl = `https://www.googleapis.com/youtube/v3/videos?key=${apiKey}&id=${videoIds}&part=statistics`;
+            
+            const statsResponse = await fetch(statsUrl);
+            const statsData = await statsResponse.json();
+
+            statsData.items.forEach(stats => {
+                const video = videos.find(v => v.id === stats.id);
+                if (video) {
+                    video.views = stats.statistics.viewCount;
+                    video.likes = stats.statistics.likeCount;
+                    video.commentCount = stats.statistics.commentCount;
+                }
+            });
+
+            renderVideos(videos);
+
+        } catch (error) {
+            console.error('Error:', error);
+            displayStatus('Gagal memuat video. Periksa koneksi atau kunci API Anda.');
+        } finally {
+            hideLoadingIndicator();
+            isLoading = false;
+        }
+    }
+
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            currentSort = button.dataset.sort;
+            fetchVideos(currentSort, ''); // Fetch new videos with empty pageToken
+        });
+    });
+
+    window.addEventListener('scroll', () => {
+        const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+        const isNearBottom = scrollTop + clientHeight >= scrollHeight - 200;
+
+        if (isNearBottom && !isLoading && nextPageToken) {
+            fetchVideos(currentSort, nextPageToken);
+        }
+    });
+
+    window.onload = () => {
+        fetchVideos(currentSort, '');
+    };
+</script>
+
+</body>
+</html>
