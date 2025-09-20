@@ -16,15 +16,15 @@
             display: flex;
             justify-content: center;
             min-height: 100vh;
-            padding: 2rem;
+            padding: 0.5rem; /* Margin diubah menjadi sangat kecil */
         }
         .container {
             width: 100%;
-            max-width: 48rem;
+            /* max-width: 48rem; Dihapus untuk membuat widget memenuhi lebar layar */
             background-color: #ffffff;
             border-radius: 1.5rem;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            padding: 2rem;
+            padding: 0.5rem; /* Padding diubah agar lebih ringkas */
         }
         .video-grid {
             display: grid;
@@ -83,11 +83,15 @@
 <body>
 
 <div class="container">
-    <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Video Terbaru dari OVISUIchannel</h1>
-
-    <div class="flex gap-2 mb-6">
-        <button class="tab-button active" data-sort="date">Latest</button>
-        <button class="tab-button" data-sort="viewCount">Most Popular</button>
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex gap-2">
+            <button class="tab-button active" data-sort="date">Latest</button>
+            <button class="tab-button" data-sort="viewCount">Most Popular</button>
+        </div>
+        <a href="https://www.youtube.com/channel/UCPJH3LDK8yzvxUEzyI-ftaA" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 text-red-500 font-semibold">
+            <i class="fab fa-youtube text-2xl"></i>
+            <span>OVISUIchannel</span>
+        </a>
     </div>
 
     <div id="video-list" class="video-grid">
@@ -247,7 +251,6 @@
                 thumbnail: item.snippet.thumbnails.high.url,
                 publishedAt: item.snippet.publishedAt
             }));
-
 
             if (videos.length === 0 && !videoListContainer.hasChildNodes()) {
                 displayStatus('Tidak ada video yang ditemukan.');
