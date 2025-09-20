@@ -233,7 +233,7 @@
             return;
         }
 
-        const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&order=${sortOrder}&maxResults=10&key=${apiKey}&type=video&pageToken=${pageToken}`;
+        const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&order=${sortOrder}&maxResults=24&key=${apiKey}&type=video&pageToken=${pageToken}`;
         
         try {
             const searchResponse = await fetch(searchUrl);
