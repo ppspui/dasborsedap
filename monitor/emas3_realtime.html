@@ -74,6 +74,8 @@
         let minuteAverages = [];
         let lastKnownUserCount = null;
         let consecutiveFailures = 0;
+        let isProcessing = false;
+        let processingStartTime = 0; // Variabel baru untuk mengontrol animasi
 
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -98,8 +100,11 @@
         }
         
         async function fetchAndProcessData() {
+            isProcessing = true;
+            processingStartTime = Date.now(); // Catat waktu mulai proses
             updateStatus('blue', false);
             const userCount = await getHistatsOnlineCount(config.workerUrl);
+            isProcessing = false;
             
             if (userCount !== null && userCount > 0) {
                 consecutiveFailures = 0;
@@ -134,10 +139,17 @@
 
             if (minuteDataBuffer.length > 6) {
                 const toConsolidate = minuteDataBuffer.slice(0, 6);
-                const sum = toConsolidate.reduce((acc, data) => acc + data.value, 0);
-                const avg = Math.round(sum / toConsolidate.length);
+                const values = toConsolidate.map(d => d.value);
+                const sum = values.reduce((acc, data) => acc + data, 0);
                 
-                minuteAverages.push({ value: avg });
+                const avgData = {
+                    mean: Math.round(sum / toConsolidate.length),
+                    max: Math.max(...values),
+                    min: Math.min(...values),
+                    time: toConsolidate[0].time
+                };
+                
+                minuteAverages.push(avgData);
                 
                 minuteDataBuffer.splice(0, 6);
 
@@ -158,11 +170,10 @@
             minuteAverages.forEach((avgData, index) => {
                 const relativeMinute = minuteAverages.length - index;
                 newLabels.push(`-${relativeMinute}m`);
-                newData.push(avgData.value);
+                newData.push(avgData.mean);
                 newColors.push(avgColor);
             });
 
-            // Label untuk data live sekarang dibuat kosong, karena akan digambar oleh plugin
             minuteDataBuffer.forEach(() => {
                 newLabels.push('');
             });
@@ -176,25 +187,40 @@
             chart.data.datasets[0].data = newData;
             chart.data.datasets[0].backgroundColor = newColors;
             
-            chart.update();
+            chart.update('none');
         }
 
         function updateStatus(color, pulse) {
             statusIcon.className = `status-dot bg-${color}-500 ${pulse ? '' : 'inactive'}`;
         }
         
-        // --- PLUGIN BARU UNTUK INDIKATOR MENIT SAAT INI ---
-        const currentMinuteIndicator = {
-            id: 'currentMinuteIndicator',
+        const customIndicators = {
+            id: 'customIndicators',
             afterDraw: (chart) => {
-                const liveDataCount = minuteDataBuffer.length;
-                if (liveDataCount === 0) {
-                    return; // Jika tidak ada data live, jangan gambar apa-apa
-                }
-
+                const consolidatedCount = minuteAverages.length;
                 const ctx = chart.ctx;
                 const meta = chart.getDatasetMeta(0);
                 const chartArea = chart.chartArea;
+                
+                ctx.save();
+                ctx.strokeStyle = 'rgba(30, 64, 175, 0.8)';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < consolidatedCount; i++) {
+                    const bar = meta.data[i];
+                    const avgData = minuteAverages[i];
+                    const meanY = chart.scales.y.getPixelForValue(avgData.mean);
+                    const maxY = chart.scales.y.getPixelForValue(avgData.max);
+                    const x = bar.x;
+
+                    ctx.beginPath();
+                    ctx.moveTo(x, meanY);
+                    ctx.lineTo(x, maxY);
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                const liveDataCount = minuteDataBuffer.length;
+                if (liveDataCount === 0) return;
                 
                 const startIndex = minuteAverages.length;
                 const firstLiveBar = meta.data[startIndex];
@@ -204,27 +230,51 @@
 
                 const startX = firstLiveBar.x - firstLiveBar.width / 2;
                 const endX = lastLiveBar.x + lastLiveBar.width / 2;
-                const lineY = chartArea.bottom + 15; // Posisi Y di bawah sumbu X
+                const totalWidth = endX - startX;
+                const lineY = chartArea.bottom + 15;
                 
-                // Gambar garis bawah
                 ctx.save();
                 ctx.beginPath();
-                ctx.strokeStyle = '#9ca3af'; // Warna abu-abu
-                ctx.lineWidth = 1;
+                ctx.strokeStyle = '#e5e7eb';
+                ctx.lineWidth = 2;
                 ctx.moveTo(startX, lineY);
                 ctx.lineTo(endX, lineY);
                 ctx.stroke();
 
-                // Ambil waktu dari data live pertama
+                const progress = liveDataCount / 6;
+                const animatedWidth = totalWidth * progress;
+
+                ctx.beginPath();
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 2;
+                ctx.moveTo(startX, lineY);
+                ctx.lineTo(startX + animatedWidth, lineY);
+                ctx.stroke();
+
                 const liveTime = minuteDataBuffer[0].time;
                 const timestamp = `${liveTime.getHours().toString().padStart(2, '0')}:${liveTime.getMinutes().toString().padStart(2, '0')}`;
                 
-                // Gambar teks timestamp
-                ctx.fillStyle = '#6b7280'; // Warna teks abu-abu
+                ctx.fillStyle = '#6b7280';
                 ctx.font = '12px sans-serif';
-                ctx.textAlign = 'right'; // Rata kanan
-                ctx.fillText(timestamp, endX, lineY - 5); // Tampilkan di atas garis
+                ctx.textAlign = 'right';
+                ctx.fillText(timestamp, endX, lineY - 5);
                 ctx.restore();
+
+                // --- PERUBAHAN DI SINI: Animasi "Tumbuh" Tunggal ---
+                if (isProcessing && lastLiveBar) {
+                    ctx.save();
+                    const bar = lastLiveBar;
+                    const animationDuration = 500; // Durasi animasi dalam milidetik
+                    const elapsed = Date.now() - processingStartTime;
+                    const growthProgress = Math.min(elapsed / animationDuration, 1);
+
+                    const animatedHeight = bar.height * growthProgress;
+                    const animatedY = bar.base - animatedHeight;
+
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                    ctx.fillRect(bar.x - bar.width / 2, animatedY, bar.width, animatedHeight);
+                    ctx.restore();
+                }
             }
         };
 
@@ -236,8 +286,7 @@
             const ctx = chartCanvas.getContext('2d');
             chart = new Chart(ctx, {
                 type: 'bar',
-                // Daftarkan plugin kustom
-                plugins: [currentMinuteIndicator],
+                plugins: [customIndicators],
                 data: {
                     labels: [],
                     datasets: [{
@@ -267,10 +316,51 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: { display: false },
-                        tooltip: { enabled: true }
+                        tooltip: { 
+                            enabled: true,
+                            callbacks: {
+                                title: function(tooltipItems) {
+                                    const item = tooltipItems[0];
+                                    const index = item.dataIndex;
+                                    const originalLabel = item.label;
+                                    const consolidatedCount = minuteAverages.length;
+                                    let time;
+                                    
+                                    if (index < consolidatedCount) {
+                                        time = minuteAverages[index].time;
+                                        const timestamp = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+                                        return `${originalLabel} (${timestamp})`;
+                                    } else {
+                                        const liveIndex = index - consolidatedCount;
+                                        if (minuteDataBuffer[liveIndex]) {
+                                             time = minuteDataBuffer[liveIndex].time;
+                                             const startSecond = Math.floor(liveIndex * 10).toString().padStart(2, '0');
+                                             const endSecond = (parseInt(startSecond) + 9).toString().padStart(2, '0');
+                                             return `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}:${startSecond}-${endSecond}`;
+                                        }
+                                    }
+                                    return originalLabel;
+                                },
+                                label: function(context) {
+                                    if (context.dataIndex < minuteAverages.length) {
+                                        const avgData = minuteAverages[context.dataIndex];
+                                        return `Max: ${avgData.max}, Rata²: ${avgData.mean}, Min: ${avgData.min}`;
+                                    }
+                                    return `Online: ${context.raw}`;
+                                }
+                            }
+                        }
                     }
                 }
             });
+            
+            function animationLoop() {
+                if (isProcessing) {
+                    chart.update('none');
+                }
+                requestAnimationFrame(animationLoop);
+            }
+            requestAnimationFrame(animationLoop);
         }
         
         window.onload = () => {
