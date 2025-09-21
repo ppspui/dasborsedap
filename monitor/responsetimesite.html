@@ -27,25 +27,21 @@
 </head>
 <body class="bg-gray-900 text-gray-200 flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 lg:p-8">
 
-    <div class="relative w-full max-w-5xl bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-6 sm:p-8">
+    <div class="relative w-full max-w-5xl bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-6 sm:p-8 overflow-hidden">
         <!-- Header -->
         <div class="mb-6 flex flex-col sm:flex-row justify-between items-center gap-2 text-center sm:text-left">
             <h1 class="text-xl sm:text-2xl font-bold text-white">Monitoring Response Time</h1>
             <p id="site-display" class="text-sm text-cyan-400 font-mono bg-gray-900 px-2 py-1 rounded-md"></p>
         </div>
 
-        <!-- Movable & Resizable Preview Widget -->
-        <div id="movable-widget" class="absolute top-24 right-8 bg-gray-700 rounded-lg shadow-lg border border-gray-600 hidden md:block z-10" style="width: 160px; height: 118px; min-width: 120px;">
+        <!-- Movable & Resizable Preview Widget (Hidden by default) -->
+        <div id="movable-widget" class="absolute top-24 right-8 bg-gray-700 rounded-lg shadow-lg border border-gray-600 hidden z-50" style="width: 160px; height: 118px; min-width: 120px;">
             <div id="widget-header" class="bg-gray-800 p-1 flex justify-between items-center cursor-move rounded-t-lg">
                 <span class="text-xs font-bold pl-2 text-gray-300">Preview</span>
                 <button id="minimize-btn" class="p-1 rounded hover:bg-gray-600 focus:outline-none">
                     <!-- Minimize Icon -->
                     <svg id="icon-minimize" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
-                    </svg>
-                    <!-- Maximize Icon (hidden by default) -->
-                    <svg id="icon-maximize" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4h4m12 4V4h-4M4 16v4h4m12-4v4h-4" />
                     </svg>
                 </button>
             </div>
@@ -76,17 +72,28 @@
         
         <!-- Combined Status and Stats Bar -->
         <div class="bg-gray-900 p-3 rounded-lg flex flex-nowrap items-center justify-between gap-x-2 sm:gap-x-3 md:gap-x-4 mb-6">
-            <!-- Left Side: Status & Time -->
+            <!-- Left Side: Status, Time & Placeholder -->
             <div class="flex items-center gap-2 md:gap-4">
-                <div class="flex items-center space-x-2">
-                    <span class="relative flex h-3 w-3">
-                        <span id="ping-indicator-anim" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                        <span id="ping-indicator" class="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
-                    </span>
-                    <span id="status-text" class="font-medium text-yellow-400 text-sm sm:text-base">Menunggu...</span>
+                 <div class="flex items-center gap-2 md:gap-4">
+                    <div class="flex items-center space-x-2">
+                        <span class="relative flex h-3 w-3">
+                            <span id="ping-indicator-anim" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                            <span id="ping-indicator" class="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+                        </span>
+                        <span id="status-text" class="font-medium text-yellow-400 text-sm sm:text-base">Menunggu...</span>
+                    </div>
+                    <div class="flex items-center gap-2 border-l border-gray-700 pl-2 md:pl-4">
+                        <p class="text-base sm:text-lg md:text-xl font-bold text-white"><span id="response-time-text">---</span> ms</p>
+                    </div>
                 </div>
-                <div class="flex items-center gap-2 border-l border-gray-700 pl-2 md:pl-4">
-                    <p class="text-base sm:text-lg md:text-xl font-bold text-white"><span id="response-time-text">---</span> ms</p>
+                <!-- Preview Placeholder -->
+                <div id="preview-placeholder" class="border-l border-gray-700 pl-2 md:pl-4">
+                    <button id="show-preview-btn" class="bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-1 px-3 rounded-lg flex items-center gap-2 text-sm transition-colors">
+                        <span>Preview</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4h4m12 4V4h-4M4 16v4h4m12-4v4h-4"></path>
+                        </svg>
+                    </button>
                 </div>
             </div>
 
@@ -417,17 +424,17 @@
         const widgetHeader = document.getElementById('widget-header');
         const minimizeBtn = document.getElementById('minimize-btn');
         const widgetContent = document.getElementById('widget-content');
-        const iconMinimize = document.getElementById('icon-minimize');
-        const iconMaximize = document.getElementById('icon-maximize');
         const previewIframe = document.getElementById('preview-iframe');
         const widgetSpinner = document.getElementById('widget-spinner');
         const resizeHandle = document.getElementById('resize-handle');
+        const showPreviewBtn = document.getElementById('show-preview-btn');
+        const previewPlaceholder = document.getElementById('preview-placeholder');
 
         const WIDGET_DEFAULT_WIDTH = 160;
+        const WIDGET_DEFAULT_TOP = 96; // 6rem
+        const WIDGET_DEFAULT_RIGHT = 32; // 2rem
         const WIDGET_ASPECT_RATIO = 16 / 9;
-        const WIDGET_DEFAULT_CONTENT_HEIGHT = WIDGET_DEFAULT_WIDTH / WIDGET_ASPECT_RATIO;
-        let WIDGET_DEFAULT_HEIGHT = WIDGET_DEFAULT_CONTENT_HEIGHT + 28; // Initial guess for header height
-
+        
         const WIDGET_RESET_TIMEOUT = 60000; // 60 detik
         const IFRAME_ORIGINAL_WIDTH = 1024;
         const IFRAME_RELOAD_INTERVAL = 30000; // 30 detik
@@ -436,9 +443,7 @@
         let isResizing = false;
         let offsetX, offsetY;
         let inactivityTimer = null;
-        let initialWidgetTop, initialWidgetLeft;
-        let heightBeforeMinimize = null; // Menyimpan tinggi sebelum minimize
-
+        
         function updateIframeScale() {
             if (!widgetContent || !previewIframe) return;
             const currentWidth = widgetContent.offsetWidth;
@@ -457,60 +462,61 @@
             if (widgetSpinner) widgetSpinner.classList.add('hidden');
         };
 
-        if (movableWidget && widgetHeader && minimizeBtn && resizeHandle) {
+        if (movableWidget) {
             previewIframe.src = `https://bukalms.ppspui.workers.dev/?site=${targetSite}`;
-
-            WIDGET_DEFAULT_HEIGHT = WIDGET_DEFAULT_CONTENT_HEIGHT + widgetHeader.offsetHeight;
-            movableWidget.style.height = `${WIDGET_DEFAULT_HEIGHT}px`;
-
-            initialWidgetTop = movableWidget.offsetTop;
-            initialWidgetLeft = movableWidget.offsetLeft;
             
-            function resetWidgetToDefault() {
-                if (!movableWidget) return;
-                
-                movableWidget.classList.add('transition-all', 'duration-500', 'ease-in-out');
+            function showWidget() {
+                previewPlaceholder.classList.add('hidden');
+                movableWidget.classList.remove('hidden');
 
-                movableWidget.style.top = `${initialWidgetTop}px`;
-                movableWidget.style.left = `${initialWidgetLeft}px`;
-
+                // Reset to default size and position when showing
+                movableWidget.style.top = `${WIDGET_DEFAULT_TOP}px`;
+                movableWidget.style.right = `${WIDGET_DEFAULT_RIGHT}px`;
+                movableWidget.style.left = '';
                 movableWidget.style.width = `${WIDGET_DEFAULT_WIDTH}px`;
-                movableWidget.style.height = `${WIDGET_DEFAULT_HEIGHT}px`;
-                
-                if(widgetContent.classList.contains('hidden')) {
-                    widgetContent.classList.remove('hidden');
-                    resizeHandle.classList.remove('hidden');
-                    iconMinimize.classList.remove('hidden');
-                    iconMaximize.classList.add('hidden');
-                    widgetHeader.classList.remove('rounded-lg');
-                    widgetHeader.classList.add('rounded-t-lg');
-                }
 
-                setTimeout(() => {
-                     const headerHeight = widgetHeader.offsetHeight;
-                     widgetContent.style.height = `${WIDGET_DEFAULT_HEIGHT - headerHeight}px`;
-                     updateIframeScale();
-                }, 500);
+                const headerHeight = widgetHeader.offsetHeight || 28;
+                const newContentHeight = WIDGET_DEFAULT_WIDTH / WIDGET_ASPECT_RATIO;
+                const newHeight = newContentHeight + headerHeight;
+                movableWidget.style.height = `${newHeight}px`;
+                widgetContent.style.height = `${newContentHeight}px`;
+
+                // Make sure it's not minimized
+                widgetContent.classList.remove('hidden');
+                resizeHandle.classList.remove('hidden');
+                widgetHeader.classList.remove('rounded-lg');
+                widgetHeader.classList.add('rounded-t-lg');
+
+                updateIframeScale();
+                startInactivityTimer();
+            }
+
+            function hideWidget() {
+                movableWidget.classList.add('hidden');
+                previewPlaceholder.classList.remove('hidden');
+                clearTimeout(inactivityTimer);
             }
 
             function startInactivityTimer() {
                 clearTimeout(inactivityTimer);
-                inactivityTimer = setTimeout(resetWidgetToDefault, WIDGET_RESET_TIMEOUT);
+                inactivityTimer = setTimeout(hideWidget, WIDGET_RESET_TIMEOUT);
             }
             
+            showPreviewBtn.addEventListener('click', showWidget);
+            minimizeBtn.addEventListener('click', hideWidget);
+
             widgetHeader.addEventListener('mousedown', (e) => {
                 if (e.target === minimizeBtn || minimizeBtn.contains(e.target) || e.target === resizeHandle) return;
-                movableWidget.classList.remove('transition-all', 'duration-500', 'ease-in-out');
                 isDragging = true;
-                offsetX = e.clientX - movableWidget.getBoundingClientRect().left;
-                offsetY = e.clientY - movableWidget.getBoundingClientRect().top;
+                const rect = movableWidget.getBoundingClientRect();
+                offsetX = e.clientX - rect.left;
+                offsetY = e.clientY - rect.top;
                 document.body.classList.add('no-select');
                 clearTimeout(inactivityTimer);
                 e.preventDefault();
             });
 
             resizeHandle.addEventListener('mousedown', (e) => {
-                movableWidget.classList.remove('transition-all', 'duration-500', 'ease-in-out');
                 isResizing = true;
                 document.body.classList.add('no-select');
                 clearTimeout(inactivityTimer);
@@ -526,12 +532,12 @@
                     newY = Math.max(0, Math.min(newY, parentRect.height - movableWidget.offsetHeight));
                     movableWidget.style.left = `${newX}px`;
                     movableWidget.style.top = `${newY}px`;
+                    movableWidget.style.right = 'auto';
                 }
 
                 if (isResizing) {
                     const rect = movableWidget.getBoundingClientRect();
                     let newWidth = e.clientX - rect.left;
-                    
                     newWidth = Math.max(120, newWidth);
 
                     const headerHeight = widgetHeader.offsetHeight;
@@ -554,31 +560,6 @@
                 isResizing = false;
                 document.body.classList.remove('no-select');
             });
-            
-            minimizeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isMinimized = widgetContent.classList.toggle('hidden');
-                resizeHandle.classList.toggle('hidden', isMinimized);
-                iconMinimize.classList.toggle('hidden');
-                iconMaximize.classList.toggle('hidden');
-
-                widgetHeader.classList.toggle('rounded-lg', isMinimized);
-                widgetHeader.classList.toggle('rounded-t-lg', !isMinimized);
-
-                if (isMinimized) {
-                    // Simpan tinggi saat ini sebelum minimize
-                    heightBeforeMinimize = movableWidget.offsetHeight;
-                    movableWidget.style.height = 'auto';
-                } else {
-                    // Kembalikan ke tinggi sebelum di-minimize
-                    const restoreHeight = heightBeforeMinimize || WIDGET_DEFAULT_HEIGHT;
-                    movableWidget.style.height = `${restoreHeight}px`;
-                    const headerHeight = widgetHeader.offsetHeight;
-                    widgetContent.style.height = `${Math.max(0, restoreHeight - headerHeight)}px`;
-                    updateIframeScale();
-                }
-                startInactivityTimer();
-            });
         }
         
         // --- INISIALISASI ---
@@ -586,11 +567,15 @@
         setInterval(checkResponseTime, CHECK_INTERVAL_MS);
 
         if(movableWidget) {
+            // Initially hide the movable widget
+            movableWidget.classList.add('hidden');
+            previewPlaceholder.classList.remove('hidden');
+
             updateIframeScale();
             setInterval(reloadPreviewIframe, IFRAME_RELOAD_INTERVAL);
-            startInactivityTimer();
         }
     </script>
 
 </body>
 </html>
+
