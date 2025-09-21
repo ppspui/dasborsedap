@@ -3,87 +3,281 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Realtime Visitor Widget</title>
+    <title>Grafik User Online (Bar)</title>
+    <!-- Memuat Tailwind CSS untuk styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Memuat Chart.js untuk grafik -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: transparent; /* Makes iframe background transparent */
+        .status-dot {
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(22, 163, 74, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+        }
+        .status-dot.inactive {
+            animation: none;
         }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen bg-transparent">
-
-    <div class="bg-white p-6 rounded-2xl shadow-lg w-full max-w-xs mx-auto border border-gray-200">
-        <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center space-x-2">
-                <span class="relative flex h-3 w-3">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                </span>
-                <p class="text-sm font-medium text-gray-600">Live</p>
+<body class="bg-gray-100 font-sans antialiased text-gray-800 flex items-center justify-center min-h-screen">
+    <!-- Container utama widget -->
+    <div class="w-full max-w-[400px] bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="p-6">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex items-baseline space-x-2">
+                    <h1 id="site-title" class="text-lg font-bold text-gray-800">Memuat...</h1>
+                    <span id="header-user-count" class="text-xl font-bold text-blue-600">-</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <a id="stats-link" href="#" target="_blank" title="Lihat Statistik Lengkap">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400 hover:text-blue-600"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+                    </a>
+                    <div id="status-icon" class="status-dot bg-gray-400 inactive" title="Status"></div>
+                </div>
             </div>
-            <!-- Google Analytics Icon -->
-            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-        </div>
-        
-        <div>
-            <p id="visitor-count" class="text-5xl font-bold text-gray-800 text-center transition-all duration-300">
-                ...
-            </p>
-            <p class="text-center text-gray-500 text-sm mt-1">Pengguna Online Saat Ini</p>
-        </div>
-
-        <div class="mt-4 border-t border-gray-100 pt-3">
-            <p id="last-updated" class="text-xs text-center text-gray-400">Memuat data...</p>
+            
+            <!-- Area Grafik -->
+            <div class="relative aspect-[16/9]">
+                <canvas id="userChart"></canvas>
+            </div>
         </div>
     </div>
 
     <script>
-        const visitorCountElement = document.getElementById('visitor-count');
-        const lastUpdatedElement = document.getElementById('last-updated');
+        // ===================================================================================
+        // --- KONFIGURASI WIDGET ---
+        // ===================================================================================
+        const config = {
+            workerUrl: 'https://ccuhistatsemas3.nyamtad.workers.dev/',
+            monitoredSite: 'emas3.ui.ac.id',
+            statsUrl: 'https://www.histats.com/viewstats/?SID=4919902&f=2',
+            updateInterval: 10000,
+        };
+        // ===================================================================================
 
-        // URL ini sudah mengarah ke Cloud Function Anda
-        const API_ENDPOINT = 'https://get-realtime-visitors-695065982410.asia-southeast2.run.app/'; 
+        const statusIcon = document.getElementById('status-icon');
+        const chartCanvas = document.getElementById('userChart');
+        const headerUserCount = document.getElementById('header-user-count');
+        const siteTitle = document.getElementById('site-title');
+        const statsLink = document.getElementById('stats-link');
 
-        async function fetchRealtimeUsers() {
-            try {
-                const response = await fetch(API_ENDPOINT);
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(`HTTP error! status: ${response.status} - ${errorData.details || errorData.error}`);
+        let chart;
+        let minuteDataBuffer = []; 
+        let minuteAverages = [];
+        let lastKnownUserCount = null;
+        let consecutiveFailures = 0;
+
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        async function getHistatsOnlineCount(workerUrl, retries = 1) {
+            for (let i = 0; i <= retries; i++) {
+                try {
+                    const response = await fetch(`${workerUrl}?_=${new Date().getTime()}`);
+                    if (!response.ok) {
+                        throw new Error(`Gagal mengambil data, status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    return data.livearray.livesummary.cur_online;
+                } catch (error) {
+                    console.error(`Percobaan ${i + 1} gagal:`, error.message);
+                    if (i < retries) {
+                        await sleep(2000);
+                    } else {
+                        return null;
+                    }
                 }
-                const data = await response.json();
-                updateWidget(data);
-            } catch (error) {
-                console.error('Gagal mengambil data visitor:', error);
-                visitorCountElement.textContent = 'Error';
-                lastUpdatedElement.textContent = 'Gagal memuat. Periksa konsol.';
             }
         }
         
-        function updateWidget(data) {
-            // Animasi sederhana untuk perubahan angka
-            visitorCountElement.classList.add('opacity-0', '-translate-y-2');
+        async function fetchAndProcessData() {
+            updateStatus('blue', false);
+            const userCount = await getHistatsOnlineCount(config.workerUrl);
             
-            setTimeout(() => {
-                visitorCountElement.textContent = data.activeUsers || 0;
-                visitorCountElement.classList.remove('opacity-0', '-translate-y-2');
-            }, 200);
-
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            lastUpdatedElement.textContent = `Diperbarui: ${timeString}`;
+            if (userCount !== null && userCount > 0) {
+                consecutiveFailures = 0;
+                lastKnownUserCount = userCount;
+                headerUserCount.textContent = userCount;
+                addDataToChart(userCount, false);
+            } else {
+                consecutiveFailures++;
+                if (lastKnownUserCount !== null && consecutiveFailures < 6) {
+                    headerUserCount.textContent = lastKnownUserCount;
+                    addDataToChart(lastKnownUserCount, true);
+                    updateStatus('yellow', true);
+                } else {
+                    headerUserCount.textContent = 'X';
+                    updateStatus('red', false);
+                }
+            }
         }
 
-        // Panggil fungsi pertama kali saat halaman dimuat
-        fetchRealtimeUsers();
+        async function runProcessLoop() {
+            await fetchAndProcessData();
+            if (consecutiveFailures < 6) {
+                updateStatus('green', true);
+            }
+            setTimeout(runProcessLoop, config.updateInterval);
+        }
 
-        // Atur interval untuk mengambil data setiap 30 detik (30000 ms)
-        setInterval(fetchRealtimeUsers, 30000);
+        function addDataToChart(userCount, isStale) {
+            const now = new Date();
+            
+            minuteDataBuffer.push({ value: userCount, isStale: isStale, time: now });
+
+            if (minuteDataBuffer.length > 6) {
+                const toConsolidate = minuteDataBuffer.slice(0, 6);
+                const sum = toConsolidate.reduce((acc, data) => acc + data.value, 0);
+                const avg = Math.round(sum / toConsolidate.length);
+                
+                minuteAverages.push({ value: avg });
+                
+                minuteDataBuffer.splice(0, 6);
+
+                const maxHistory = 9;
+                if (minuteAverages.length > maxHistory) {
+                    minuteAverages.shift();
+                }
+            }
+
+            const newLabels = [];
+            const newData = [];
+            const newColors = [];
+            
+            const liveColor = 'rgba(96, 165, 250, 0.7)';
+            const avgColor = 'rgba(30, 64, 175, 0.8)';
+            const staleColor = 'rgba(156, 163, 175, 0.6)';
+
+            minuteAverages.forEach((avgData, index) => {
+                const relativeMinute = minuteAverages.length - index;
+                newLabels.push(`-${relativeMinute}m`);
+                newData.push(avgData.value);
+                newColors.push(avgColor);
+            });
+
+            // Label untuk data live sekarang dibuat kosong, karena akan digambar oleh plugin
+            minuteDataBuffer.forEach(() => {
+                newLabels.push('');
+            });
+            minuteDataBuffer.forEach(liveData => {
+                newData.push(liveData.value);
+                const color = liveData.isStale ? staleColor : liveColor;
+                newColors.push(color);
+            });
+            
+            chart.data.labels = newLabels;
+            chart.data.datasets[0].data = newData;
+            chart.data.datasets[0].backgroundColor = newColors;
+            
+            chart.update();
+        }
+
+        function updateStatus(color, pulse) {
+            statusIcon.className = `status-dot bg-${color}-500 ${pulse ? '' : 'inactive'}`;
+        }
+        
+        // --- PLUGIN BARU UNTUK INDIKATOR MENIT SAAT INI ---
+        const currentMinuteIndicator = {
+            id: 'currentMinuteIndicator',
+            afterDraw: (chart) => {
+                const liveDataCount = minuteDataBuffer.length;
+                if (liveDataCount === 0) {
+                    return; // Jika tidak ada data live, jangan gambar apa-apa
+                }
+
+                const ctx = chart.ctx;
+                const meta = chart.getDatasetMeta(0);
+                const chartArea = chart.chartArea;
+                
+                const startIndex = minuteAverages.length;
+                const firstLiveBar = meta.data[startIndex];
+                const lastLiveBar = meta.data[meta.data.length - 1];
+
+                if (!firstLiveBar || !lastLiveBar) return;
+
+                const startX = firstLiveBar.x - firstLiveBar.width / 2;
+                const endX = lastLiveBar.x + lastLiveBar.width / 2;
+                const lineY = chartArea.bottom + 15; // Posisi Y di bawah sumbu X
+                
+                // Gambar garis bawah
+                ctx.save();
+                ctx.beginPath();
+                ctx.strokeStyle = '#9ca3af'; // Warna abu-abu
+                ctx.lineWidth = 1;
+                ctx.moveTo(startX, lineY);
+                ctx.lineTo(endX, lineY);
+                ctx.stroke();
+
+                // Ambil waktu dari data live pertama
+                const liveTime = minuteDataBuffer[0].time;
+                const timestamp = `${liveTime.getHours().toString().padStart(2, '0')}:${liveTime.getMinutes().toString().padStart(2, '0')}`;
+                
+                // Gambar teks timestamp
+                ctx.fillStyle = '#6b7280'; // Warna teks abu-abu
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'right'; // Rata kanan
+                ctx.fillText(timestamp, endX, lineY - 5); // Tampilkan di atas garis
+                ctx.restore();
+            }
+        };
+
+        function initialize() {
+            siteTitle.textContent = `Online ${config.monitoredSite}:`;
+            statsLink.href = config.statsUrl;
+            updateStatus('gray', false);
+            
+            const ctx = chartCanvas.getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'bar',
+                // Daftarkan plugin kustom
+                plugins: [currentMinuteIndicator],
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'User Online',
+                        data: [],
+                        backgroundColor: [],
+                        borderWidth: 0,
+                        barPercentage: 0.9,
+                        categoryPercentage: 0.8,
+                    }]
+                },
+                options: {
+                    scales: {
+                       x: { 
+                           display: true,
+                           grid: { display: false }
+                        },
+                       y: { 
+                           display: true,
+                           beginAtZero: true,
+                           ticks: {
+                               callback: function(value) { if (value % 1 === 0) return value; }
+                           }
+                        }
+                    },
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: true }
+                    }
+                }
+            });
+        }
+        
+        window.onload = () => {
+            initialize();
+            runProcessLoop();
+        };
     </script>
-
 </body>
 </html>
 
