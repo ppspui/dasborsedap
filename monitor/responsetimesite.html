@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grafik Real-time Response Time</title>
+    <!-- Menggunakan Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Menggunakan Chart.js untuk membuat grafik -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Menggunakan Google Fonts untuk tampilan yang lebih baik -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Mencegah seleksi teks saat menyeret atau mengubah ukuran widget */
+        .no-select {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 lg:p-8">
+
+    <div class="relative w-full max-w-5xl bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-6 sm:p-8">
+        <!-- Header -->
+        <div class="mb-6 flex flex-col sm:flex-row justify-between items-center gap-2 text-center sm:text-left">
+            <h1 class="text-xl sm:text-2xl font-bold text-white">Monitoring Response Time</h1>
+            <p id="site-display" class="text-sm text-cyan-400 font-mono bg-gray-900 px-2 py-1 rounded-md"></p>
+        </div>
+
+        <!-- Movable & Resizable Preview Widget -->
+        <div id="movable-widget" class="absolute top-24 right-8 bg-gray-700 rounded-lg shadow-lg border border-gray-600 hidden md:block z-10" style="width: 160px; height: 118px; min-width: 120px;">
+            <div id="widget-header" class="bg-gray-800 p-1 flex justify-between items-center cursor-move rounded-t-lg">
+                <span class="text-xs font-bold pl-2 text-gray-300">Preview</span>
+                <button id="minimize-btn" class="p-1 rounded hover:bg-gray-600 focus:outline-none">
+                    <!-- Minimize Icon -->
+                    <svg id="icon-minimize" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+                    </svg>
+                    <!-- Maximize Icon (hidden by default) -->
+                    <svg id="icon-maximize" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4h4m12 4V4h-4M4 16v4h4m12-4v4h-4" />
+                    </svg>
+                </button>
+            </div>
+            <div id="widget-content" class="relative rounded-b-lg" style="height: 90px; overflow: hidden; background-color: #111827;">
+                 <!-- Loading Spinner -->
+                <div id="widget-spinner" class="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-20 hidden">
+                    <svg class="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </div>
+                 <!-- Non-interactive Overlay -->
+                <div class="absolute inset-0 z-10"></div>
+                 <iframe 
+                    id="preview-iframe"
+                    src="" 
+                    style="
+                        width: 1024px; 
+                        height: 576px;
+                        transform-origin: 0 0;
+                        border: none;" 
+                    title="Tampilan Situs">
+                </iframe>
+            </div>
+            <!-- Resize Handle -->
+            <div id="resize-handle" class="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-30"></div>
+        </div>
+        
+        <!-- Combined Status and Stats Bar -->
+        <div class="bg-gray-900 p-3 rounded-lg flex flex-nowrap items-center justify-between gap-x-2 sm:gap-x-3 md:gap-x-4 mb-6">
+            <!-- Left Side: Status & Time -->
+            <div class="flex items-center gap-2 md:gap-4">
+                <div class="flex items-center space-x-2">
+                    <span class="relative flex h-3 w-3">
+                        <span id="ping-indicator-anim" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                        <span id="ping-indicator" class="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+                    </span>
+                    <span id="status-text" class="font-medium text-yellow-400 text-sm sm:text-base">Menunggu...</span>
+                </div>
+                <div class="flex items-center gap-2 border-l border-gray-700 pl-2 md:pl-4">
+                    <p class="text-base sm:text-lg md:text-xl font-bold text-white"><span id="response-time-text">---</span> ms</p>
+                </div>
+            </div>
+
+            <!-- Right Side: Stats -->
+            <div class="flex items-center gap-x-2 sm:gap-x-3 md:gap-x-6">
+                <div class="text-center">
+                    <p class="text-xs text-gray-400">Pengecekan</p>
+                    <p id="stat-checks" class="text-sm sm:text-base font-bold text-white">0</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-xs text-gray-400">Gagal</p>
+                    <p id="stat-fails" class="text-sm sm:text-base font-bold text-red-400">0</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-xs text-gray-400">Rata-rata</p>
+                    <p id="stat-avg" class="text-sm sm:text-base font-bold text-yellow-400">---</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-xs text-gray-400">P95</p>
+                    <p id="stat-p95" class="text-sm sm:text-base font-bold text-orange-400">---</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-xs text-gray-400">Downstream</p>
+                    <p id="stat-speed" class="text-sm sm:text-base font-bold text-blue-400">---</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Konten Utama: Grafik -->
+        <div class="mt-8">
+            <div class="bg-gray-900 p-4 rounded-lg">
+                 <h2 class="text-lg font-semibold text-white mb-3 text-center">Grafik Kinerja</h2>
+                 <div class="relative h-64 sm:h-80 lg:h-96">
+                    <canvas id="responseTimeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="mt-8 text-center text-gray-500 text-sm">
+        <p>Grafik akan diperbarui setiap 10 detik. Menggunakan proxy untuk menghindari masalah CORS.</p>
+    </footer>
+
+    <script>
+        // --- URL Parameter Handling ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const siteFromUrl = urlParams.get('site');
+        const DEFAULT_SITE = 'emas3.ui.ac.id';
+        const targetSite = siteFromUrl || DEFAULT_SITE;
+
+        document.getElementById('site-display').textContent = targetSite;
+        
+        let finalTargetUrl = targetSite;
+        if (!finalTargetUrl.startsWith('http://') && !finalTargetUrl.startsWith('https://')) {
+            finalTargetUrl = 'https://' + finalTargetUrl;
+        }
+
+        // --- KONFIGURASI ---
+        const TARGET_URL = finalTargetUrl;
+        const PROXY_URL = `https://api.allorigins.win/get?url=${encodeURIComponent(TARGET_URL)}`;
+        const CHECK_INTERVAL_MS = 10000; // 10 detik
+        const REQUEST_TIMEOUT_MS = CHECK_INTERVAL_MS - 500; // Timeout diatur ke 9.5 detik
+        const MAX_DATA_POINTS = 180; // 180 titik data = 30 menit (180 titik * 10 detik / 60s)
+
+        // --- ELEMEN DOM ---
+        const ctx = document.getElementById('responseTimeChart').getContext('2d');
+        const statusText = document.getElementById('status-text');
+        const responseTimeText = document.getElementById('response-time-text');
+        const pingIndicator = document.getElementById('ping-indicator');
+        const pingIndicatorAnim = document.getElementById('ping-indicator-anim');
+        const statChecks = document.getElementById('stat-checks');
+        const statFails = document.getElementById('stat-fails');
+        const statAvg = document.getElementById('stat-avg');
+        const statP95 = document.getElementById('stat-p95');
+        const statSpeed = document.getElementById('stat-speed');
+
+        // --- STATE APLIKASI ---
+        let responseHistory = [];
+        let totalChecks = 0;
+        let totalFails = 0;
+        let lastKnownSpeed = null;
+
+        // --- Inisialisasi Chart.js ---
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(56, 189, 248, 0.4)');
+        gradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
+
+        const responseTimeChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                {
+                    label: 'Response Time (ms)',
+                    data: [],
+                    borderColor: 'rgb(56, 189, 248)',
+                    backgroundColor: gradient,
+                    borderWidth: 2.5,
+                    pointBackgroundColor: 'rgb(255, 255, 255)',
+                    pointBorderColor: 'rgb(56, 189, 248)',
+                    pointHoverRadius: 7,
+                    pointRadius: 4,
+                    tension: 0.4,
+                    fill: true,
+                    yAxisID: 'y-axis-1',
+                },
+                {
+                    label: 'Rata-rata (Avg)',
+                    data: [],
+                    borderColor: 'rgb(250, 204, 21)', // yellow-400
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.4,
+                    borderDash: [5, 5],
+                    fill: false,
+                    yAxisID: 'y-axis-1',
+                },
+                {
+                    label: 'Persentil ke-95 (P95)',
+                    data: [],
+                    borderColor: 'rgb(249, 115, 22)', // orange-500
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.4,
+                    fill: false,
+                    yAxisID: 'y-axis-1',
+                },
+                {
+                    label: 'Downstream (Mbps)',
+                    data: [],
+                    borderColor: 'rgb(167, 139, 250)', // purple-400
+                    borderWidth: 2.5,
+                    pointBackgroundColor: 'rgb(255, 255, 255)',
+                    pointBorderColor: 'rgb(167, 139, 250)',
+                    pointRadius: 4,
+                    stepped: true,
+                    fill: false,
+                    yAxisID: 'y-axis-2',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    'y-axis-1': {
+                        type: 'linear',
+                        position: 'left',
+                        beginAtZero: true,
+                        title: { display: true, text: 'Response Time (ms)', color: '#9ca3af' },
+                        ticks: { color: '#9ca3af' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    },
+                    'y-axis-2': {
+                        type: 'linear',
+                        position: 'right',
+                        beginAtZero: true,
+                        title: { display: true, text: 'Downstream (Mbps)', color: '#9ca3af' },
+                        ticks: { color: '#9ca3af' },
+                        grid: { drawOnChartArea: false },
+                    },
+                    x: {
+                        title: { display: false, text: 'Waktu Pengecekan', color: '#9ca3af' },
+                        ticks: { color: '#9ca3af' },
+                        grid: { display: false }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#d1d5db',
+                            boxWidth: 20,
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#1f2937',
+                        titleFont: { size: 14, weight: 'bold' },
+                        bodyFont: { size: 12 },
+                        padding: 10,
+                        cornerRadius: 8,
+                        boxPadding: 4,
+                        mode: 'index',
+                        intersect: false,
+                    }
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+            }
+        });
+
+        // --- FUNGSI UTAMA ---
+
+        async function checkDownloadSpeed() {
+            statSpeed.textContent = 'Menguji...';
+            const fileUrl = 'https://speed.cloudflare.com/__down?bytes=5000000';
+            const maxTimeMs = 3000;
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), maxTimeMs);
+            const startTime = performance.now();
+
+            try {
+                const response = await fetch(fileUrl, { signal: controller.signal, cache: 'no-cache' });
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const blob = await response.blob();
+                const endTime = performance.now();
+                clearTimeout(timeoutId);
+
+                const durationInSeconds = (endTime - startTime) / 1000;
+                const fileSizeInBytes = blob.size;
+                const bitsPerSecond = (fileSizeInBytes * 8) / durationInSeconds;
+                const megaBitsPerSecond = (bitsPerSecond / 1000 / 1000);
+
+                lastKnownSpeed = parseFloat(megaBitsPerSecond.toFixed(2));
+                statSpeed.textContent = `${lastKnownSpeed} Mbps`;
+
+            } catch (error) {
+                lastKnownSpeed = null;
+                if (error.name === 'AbortError') {
+                    console.warn('Speed test timed out.');
+                    statSpeed.textContent = 'Timeout';
+                } else {
+                    console.error('Speed test failed:', error);
+                    statSpeed.textContent = 'Gagal';
+                }
+            }
+        }
+
+        function updateStatusIndicator(status, text) {
+            pingIndicator.className = 'relative inline-flex rounded-full h-3 w-3';
+            pingIndicatorAnim.className = 'absolute inline-flex h-full w-full rounded-full opacity-75';
+            statusText.className = 'font-medium text-sm sm:text-base';
+            statusText.textContent = text;
+            pingIndicatorAnim.classList.remove('animate-ping');
+            void pingIndicatorAnim.offsetWidth;
+            pingIndicatorAnim.classList.add('animate-ping');
+
+            if (status === 'success') {
+                pingIndicator.classList.add('bg-green-500');
+                pingIndicatorAnim.classList.add('bg-green-400');
+                statusText.classList.add('text-green-400');
+            } else if (status === 'error') {
+                pingIndicator.classList.add('bg-red-500');
+                pingIndicatorAnim.classList.add('bg-red-400');
+                statusText.classList.add('text-red-400');
+            } else {
+                pingIndicator.classList.add('bg-yellow-500');
+                pingIndicatorAnim.classList.add('bg-yellow-400');
+                statusText.classList.add('text-yellow-400');
+            }
+        }
+        
+        function updateChart(label, metrics) {
+            const chartData = responseTimeChart.data;
+            chartData.labels.push(label);
+            chartData.datasets[0].data.push(metrics.actual);
+            chartData.datasets[1].data.push(metrics.avg);
+            chartData.datasets[2].data.push(metrics.p95);
+            chartData.datasets[3].data.push(metrics.speed);
+
+            if (chartData.labels.length > MAX_DATA_POINTS) {
+                chartData.labels.shift();
+                chartData.datasets.forEach(dataset => dataset.data.shift());
+            }
+            responseTimeChart.update();
+        }
+
+        async function checkResponseTime() {
+            const startTime = performance.now();
+            updateStatusIndicator('checking', 'Mengecek...');
+            totalChecks++;
+
+            if (totalChecks === 1 || totalChecks % 3 === 0) {
+                 checkDownloadSpeed();
+            }
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+                const response = await fetch(PROXY_URL, { method: 'GET', cache: 'no-cache', signal: controller.signal });
+                clearTimeout(timeoutId);
+                const endTime = performance.now();
+                const timeTaken = Math.round(endTime - startTime);
+                if (!response.ok) throw new Error(`Status: ${response.status}`);
+
+                responseHistory.push(timeTaken);
+                if (responseHistory.length > MAX_DATA_POINTS * 2) { 
+                    responseHistory.shift();
+                }
+                responseTimeText.textContent = timeTaken;
+                updateStatusIndicator('success', 'Online');
+                
+                const avg = responseHistory.reduce((a, b) => a + b, 0) / responseHistory.length;
+                const sortedHistory = [...responseHistory].sort((a, b) => a - b);
+                const p95Index = Math.floor(sortedHistory.length * 0.95);
+                const p95 = sortedHistory[p95Index] || 0;
+
+                statAvg.textContent = `${Math.round(avg)} ms`;
+                statP95.textContent = `${p95} ms`;
+
+                const currentTime = new Date().toLocaleTimeString('id-ID');
+                updateChart(currentTime, { actual: timeTaken, avg: avg, p95: p95, speed: lastKnownSpeed });
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.warn(`Request timed out after ${REQUEST_TIMEOUT_MS}ms.`);
+                } else {
+                    console.error('Fetch Error:', error);
+                }
+                totalFails++;
+                let errorMessage = 'Gagal';
+                if (error.name === 'AbortError') errorMessage = 'Timeout';
+                responseTimeText.textContent = 'Error';
+                updateStatusIndicator('error', errorMessage);
+                const currentTime = new Date().toLocaleTimeString('id-ID');
+                updateChart(currentTime, { actual: null, avg: null, p95: null, speed: lastKnownSpeed });
+            }
+            statChecks.textContent = totalChecks;
+            statFails.textContent = totalFails;
+        }
+
+        // --- WIDGET LOGIC ---
+        const movableWidget = document.getElementById('movable-widget');
+        const widgetHeader = document.getElementById('widget-header');
+        const minimizeBtn = document.getElementById('minimize-btn');
+        const widgetContent = document.getElementById('widget-content');
+        const iconMinimize = document.getElementById('icon-minimize');
+        const iconMaximize = document.getElementById('icon-maximize');
+        const previewIframe = document.getElementById('preview-iframe');
+        const widgetSpinner = document.getElementById('widget-spinner');
+        const resizeHandle = document.getElementById('resize-handle');
+
+        const WIDGET_DEFAULT_WIDTH = 160;
+        const WIDGET_ASPECT_RATIO = 16 / 9;
+        const WIDGET_DEFAULT_CONTENT_HEIGHT = WIDGET_DEFAULT_WIDTH / WIDGET_ASPECT_RATIO;
+        let WIDGET_DEFAULT_HEIGHT = WIDGET_DEFAULT_CONTENT_HEIGHT + 28; // Initial guess for header height
+
+        const WIDGET_RESET_TIMEOUT = 60000; // 60 detik
+        const IFRAME_ORIGINAL_WIDTH = 1024;
+        const IFRAME_RELOAD_INTERVAL = 30000; // 30 detik
+        
+        let isDragging = false;
+        let isResizing = false;
+        let offsetX, offsetY;
+        let inactivityTimer = null;
+        let initialWidgetTop, initialWidgetLeft;
+        let heightBeforeMinimize = null; // Menyimpan tinggi sebelum minimize
+
+        function updateIframeScale() {
+            if (!widgetContent || !previewIframe) return;
+            const currentWidth = widgetContent.offsetWidth;
+            const scale = currentWidth / IFRAME_ORIGINAL_WIDTH;
+            previewIframe.style.transform = `scale(${scale})`;
+        }
+
+        function reloadPreviewIframe() {
+            if (!previewIframe || !widgetSpinner) return;
+            widgetSpinner.classList.remove('hidden');
+            const newSrc = `https://bukalms.ppspui.workers.dev/?site=${targetSite}&t=${Date.now()}`;
+            previewIframe.src = newSrc;
+        }
+
+        previewIframe.onload = () => {
+            if (widgetSpinner) widgetSpinner.classList.add('hidden');
+        };
+
+        if (movableWidget && widgetHeader && minimizeBtn && resizeHandle) {
+            previewIframe.src = `https://bukalms.ppspui.workers.dev/?site=${targetSite}`;
+
+            WIDGET_DEFAULT_HEIGHT = WIDGET_DEFAULT_CONTENT_HEIGHT + widgetHeader.offsetHeight;
+            movableWidget.style.height = `${WIDGET_DEFAULT_HEIGHT}px`;
+
+            initialWidgetTop = movableWidget.offsetTop;
+            initialWidgetLeft = movableWidget.offsetLeft;
+            
+            function resetWidgetToDefault() {
+                if (!movableWidget) return;
+                
+                movableWidget.classList.add('transition-all', 'duration-500', 'ease-in-out');
+
+                movableWidget.style.top = `${initialWidgetTop}px`;
+                movableWidget.style.left = `${initialWidgetLeft}px`;
+
+                movableWidget.style.width = `${WIDGET_DEFAULT_WIDTH}px`;
+                movableWidget.style.height = `${WIDGET_DEFAULT_HEIGHT}px`;
+                
+                if(widgetContent.classList.contains('hidden')) {
+                    widgetContent.classList.remove('hidden');
+                    resizeHandle.classList.remove('hidden');
+                    iconMinimize.classList.remove('hidden');
+                    iconMaximize.classList.add('hidden');
+                    widgetHeader.classList.remove('rounded-lg');
+                    widgetHeader.classList.add('rounded-t-lg');
+                }
+
+                setTimeout(() => {
+                     const headerHeight = widgetHeader.offsetHeight;
+                     widgetContent.style.height = `${WIDGET_DEFAULT_HEIGHT - headerHeight}px`;
+                     updateIframeScale();
+                }, 500);
+            }
+
+            function startInactivityTimer() {
+                clearTimeout(inactivityTimer);
+                inactivityTimer = setTimeout(resetWidgetToDefault, WIDGET_RESET_TIMEOUT);
+            }
+            
+            widgetHeader.addEventListener('mousedown', (e) => {
+                if (e.target === minimizeBtn || minimizeBtn.contains(e.target) || e.target === resizeHandle) return;
+                movableWidget.classList.remove('transition-all', 'duration-500', 'ease-in-out');
+                isDragging = true;
+                offsetX = e.clientX - movableWidget.getBoundingClientRect().left;
+                offsetY = e.clientY - movableWidget.getBoundingClientRect().top;
+                document.body.classList.add('no-select');
+                clearTimeout(inactivityTimer);
+                e.preventDefault();
+            });
+
+            resizeHandle.addEventListener('mousedown', (e) => {
+                movableWidget.classList.remove('transition-all', 'duration-500', 'ease-in-out');
+                isResizing = true;
+                document.body.classList.add('no-select');
+                clearTimeout(inactivityTimer);
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const parentRect = movableWidget.parentElement.getBoundingClientRect();
+                    let newX = e.clientX - offsetX - parentRect.left;
+                    let newY = e.clientY - offsetY - parentRect.top;
+                    newX = Math.max(0, Math.min(newX, parentRect.width - movableWidget.offsetWidth));
+                    newY = Math.max(0, Math.min(newY, parentRect.height - movableWidget.offsetHeight));
+                    movableWidget.style.left = `${newX}px`;
+                    movableWidget.style.top = `${newY}px`;
+                }
+
+                if (isResizing) {
+                    const rect = movableWidget.getBoundingClientRect();
+                    let newWidth = e.clientX - rect.left;
+                    
+                    newWidth = Math.max(120, newWidth);
+
+                    const headerHeight = widgetHeader.offsetHeight;
+                    const newContentHeight = newWidth / WIDGET_ASPECT_RATIO;
+                    const newHeight = newContentHeight + headerHeight;
+
+                    movableWidget.style.width = `${newWidth}px`;
+                    movableWidget.style.height = `${newHeight}px`;
+                    widgetContent.style.height = `${newContentHeight}px`;
+                    
+                    updateIframeScale();
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isDragging || isResizing) {
+                    startInactivityTimer();
+                }
+                isDragging = false;
+                isResizing = false;
+                document.body.classList.remove('no-select');
+            });
+            
+            minimizeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isMinimized = widgetContent.classList.toggle('hidden');
+                resizeHandle.classList.toggle('hidden', isMinimized);
+                iconMinimize.classList.toggle('hidden');
+                iconMaximize.classList.toggle('hidden');
+
+                widgetHeader.classList.toggle('rounded-lg', isMinimized);
+                widgetHeader.classList.toggle('rounded-t-lg', !isMinimized);
+
+                if (isMinimized) {
+                    // Simpan tinggi saat ini sebelum minimize
+                    heightBeforeMinimize = movableWidget.offsetHeight;
+                    movableWidget.style.height = 'auto';
+                } else {
+                    // Kembalikan ke tinggi sebelum di-minimize
+                    const restoreHeight = heightBeforeMinimize || WIDGET_DEFAULT_HEIGHT;
+                    movableWidget.style.height = `${restoreHeight}px`;
+                    const headerHeight = widgetHeader.offsetHeight;
+                    widgetContent.style.height = `${Math.max(0, restoreHeight - headerHeight)}px`;
+                    updateIframeScale();
+                }
+                startInactivityTimer();
+            });
+        }
+        
+        // --- INISIALISASI ---
+        checkResponseTime();
+        setInterval(checkResponseTime, CHECK_INTERVAL_MS);
+
+        if(movableWidget) {
+            updateIframeScale();
+            setInterval(reloadPreviewIframe, IFRAME_RELOAD_INTERVAL);
+            startInactivityTimer();
+        }
+    </script>
+
+</body>
+</html>
