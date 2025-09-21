@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grafik Real-time Response Time (superlite)</title>
+    <!-- Menggunakan Tailwind CSS untuk styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Menggunakan Chart.js untuk membuat grafik -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Menggunakan Google Fonts untuk tampilan yang lebih baik -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .no-select {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+        /* Custom smaller text size */
+        .text-xxs {
+            font-size: 0.65rem; /* 10.4px */
+            line-height: 0.8rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="relative w-full max-w-5xl bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl p-2.5 overflow-hidden">
+        
+        <!-- Movable & Resizable Preview Widget (Hidden by default) -->
+        <div id="movable-widget" class="absolute top-16 right-4 bg-gray-700 rounded-lg shadow-lg border border-gray-600 hidden z-50" style="width: 160px; min-width: 120px;">
+            <div id="widget-header" class="bg-gray-800 p-1 flex justify-between items-center cursor-move rounded-t-lg">
+                <span class="text-xs font-bold pl-2 text-gray-300">Preview</span>
+                <button id="minimize-btn" class="p-1 rounded hover:bg-gray-600 focus:outline-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" /></svg>
+                </button>
+            </div>
+            <div id="widget-content" class="relative rounded-b-lg" style="overflow: hidden; background-color: #111827;">
+                <div id="widget-spinner" class="absolute inset-0 flex items-center justify-center bg-gray-800 bg-opacity-75 z-20 hidden">
+                    <svg class="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                </div>
+                <div class="absolute inset-0 z-10"></div>
+                <iframe id="preview-iframe" src="" style="width: 1024px; height: 576px; transform-origin: 0 0; border: none;" title="Tampilan Situs"></iframe>
+            </div>
+            <div id="resize-handle" class="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-30"></div>
+        </div>
+
+        <!-- Single Line Header -->
+        <div class="flex justify-between items-center mb-2">
+            <!-- Left Side: Title & Site -->
+            <div>
+                <h1 class="text-md font-bold text-white whitespace-nowrap">Monitoring</h1>
+                <p id="site-display" class="text-xs text-cyan-400 font-mono -mt-1"></p>
+            </div>
+
+            <!-- Right Side: Status & Stats -->
+            <div class="flex items-center gap-3 sm:gap-4">
+                <!-- Status & Time -->
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2">
+                        <span class="relative flex h-2.5 w-2.5"><span id="ping-indicator-anim" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span><span id="ping-indicator" class="relative inline-flex rounded-full h-2.5 w-2.5 bg-yellow-500"></span></span>
+                        <span id="status-text" class="font-medium text-yellow-400 text-sm hidden sm:block">...</span>
+                    </div>
+                    <div class="flex items-center">
+                        <p class="text-base font-bold text-white"><span id="response-time-text">---</span><span class="text-xs font-normal ml-0.5">ms</span></p>
+                    </div>
+                </div>
+
+                <!-- Stats Box -->
+                <div class="bg-gray-900 p-1 rounded-md flex items-center justify-end gap-x-2.5">
+                    <div id="preview-placeholder">
+                        <button id="show-preview-btn" class="bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-0.5 px-1.5 rounded-md flex items-center gap-1 text-xxs transition-colors">
+                            <span>Preview</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4h4m12 4V4h-4M4 16v4h4m12-4v4h-4"></path></svg>
+                        </button>
+                    </div>
+                    <div class="text-center"><p class="text-xxs text-gray-400">Cek</p><p id="stat-checks" class="text-xs font-bold text-white">0</p></div>
+                    <div class="text-center"><p class="text-xxs text-gray-400">Gagal</p><p id="stat-fails" class="text-xs font-bold text-red-400">0</p></div>
+                    <div class="text-center"><p class="text-xxs text-gray-400">Speed</p><p id="stat-speed" class="text-xs font-bold text-blue-400">---</p></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Konten Utama: Grafik -->
+        <div>
+             <div class="relative h-40 sm:h-56">
+                <canvas id="responseTimeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- URL Parameter Handling ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const siteFromUrl = urlParams.get('site');
+        const DEFAULT_SITE = 'emas3.ui.ac.id';
+        const targetSite = siteFromUrl || DEFAULT_SITE;
+        document.getElementById('site-display').textContent = targetSite;
+        let finalTargetUrl = targetSite;
+        if (!finalTargetUrl.startsWith('http://') && !finalTargetUrl.startsWith('https://')) {
+            finalTargetUrl = 'https://' + finalTargetUrl;
+        }
+
+        // --- KONFIGURASI ---
+        const TARGET_URL = finalTargetUrl;
+        const PROXY_URL = `https://api.allorigins.win/get?url=${encodeURIComponent(TARGET_URL)}`;
+        const CHECK_INTERVAL_MS = 10000;
+        const REQUEST_TIMEOUT_MS = CHECK_INTERVAL_MS - 500;
+        const MAX_DATA_POINTS = 180;
+
+        // --- ELEMEN DOM ---
+        const ctx = document.getElementById('responseTimeChart').getContext('2d');
+        const statusText = document.getElementById('status-text');
+        const responseTimeText = document.getElementById('response-time-text');
+        const pingIndicator = document.getElementById('ping-indicator');
+        const pingIndicatorAnim = document.getElementById('ping-indicator-anim');
+        const statChecks = document.getElementById('stat-checks');
+        const statFails = document.getElementById('stat-fails');
+        const statSpeed = document.getElementById('stat-speed');
+
+        // --- STATE APLIKASI ---
+        let responseHistory = [];
+        let totalChecks = 0;
+        let totalFails = 0;
+        let lastKnownSpeed = null;
+
+        // --- Inisialisasi Chart.js ---
+        const gradient = ctx.createLinearGradient(0, 0, 0, 150);
+        gradient.addColorStop(0, 'rgba(56, 189, 248, 0.4)');
+        gradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        const responseTimeChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [ { label: 'Response Time (ms)', data: [], borderColor: 'rgb(56, 189, 248)', backgroundColor: gradient, borderWidth: 2, pointBackgroundColor: 'rgb(255, 255, 255)', pointBorderColor: 'rgb(56, 189, 248)', pointHoverRadius: 6, pointRadius: 3, tension: 0.4, fill: true, yAxisID: 'y-axis-1', }, { label: 'Downstream (Mbps)', data: [], borderColor: 'rgb(167, 139, 250)', borderWidth: 2, pointBackgroundColor: 'rgb(255, 255, 255)', pointBorderColor: 'rgb(167, 139, 250)', pointRadius: 3, stepped: true, fill: false, yAxisID: 'y-axis-2', } ] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { 'y-axis-1': { type: 'linear', position: 'left', beginAtZero: true, title: { display: false }, ticks: { color: '#9ca3af', font: {size: 10} }, grid: { color: 'rgba(255, 255, 255, 0.1)' } }, 'y-axis-2': { type: 'linear', position: 'right', beginAtZero: true, title: { display: false }, ticks: { color: '#9ca3af', font: {size: 10} }, grid: { drawOnChartArea: false }, }, x: { ticks: { color: '#9ca3af', font: {size: 10} }, grid: { display: false } } }, plugins: { legend: { display: true, position: 'bottom', labels: { color: '#d1d5db', boxWidth: 15, padding: 10, font: {size: 10} } }, tooltip: { backgroundColor: '#1f2937', titleFont: { size: 12 }, bodyFont: { size: 10 }, padding: 8, cornerRadius: 6, mode: 'index', intersect: false, } }, interaction: { mode: 'index', intersect: false, }, }
+        });
+
+        // --- FUNGSI UTAMA ---
+        async function checkDownloadSpeed() {
+            statSpeed.textContent = '...';
+            const fileUrl = 'https://speed.cloudflare.com/__down?bytes=5000000';
+            const maxTimeMs = 3000;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), maxTimeMs);
+            const startTime = performance.now();
+            try {
+                const response = await fetch(fileUrl, { signal: controller.signal, cache: 'no-cache' });
+                if (!response.ok) throw new Error('Network response was not ok');
+                const blob = await response.blob();
+                const endTime = performance.now();
+                clearTimeout(timeoutId);
+                const durationInSeconds = (endTime - startTime) / 1000;
+                const fileSizeInBytes = blob.size;
+                const megaBitsPerSecond = (fileSizeInBytes * 8) / durationInSeconds / 1000 / 1000;
+                lastKnownSpeed = parseFloat(megaBitsPerSecond.toFixed(2));
+                statSpeed.textContent = `${lastKnownSpeed}`;
+            } catch (error) {
+                lastKnownSpeed = null;
+                statSpeed.textContent = (error.name === 'AbortError') ? 'N/A' : 'Err';
+            }
+        }
+
+        function updateStatusIndicator(status, text) {
+            pingIndicator.className = 'relative inline-flex rounded-full h-2.5 w-2.5';
+            pingIndicatorAnim.className = 'absolute inline-flex h-full w-full rounded-full opacity-75';
+            statusText.className = 'font-medium text-sm hidden sm:block';
+            statusText.textContent = text;
+            pingIndicatorAnim.classList.remove('animate-ping'); void pingIndicatorAnim.offsetWidth; pingIndicatorAnim.classList.add('animate-ping');
+            if (status === 'success') { pingIndicator.classList.add('bg-green-500'); pingIndicatorAnim.classList.add('bg-green-400'); statusText.classList.add('text-green-400'); } 
+            else if (status === 'error') { pingIndicator.classList.add('bg-red-500'); pingIndicatorAnim.classList.add('bg-red-400'); statusText.classList.add('text-red-400'); } 
+            else { pingIndicator.classList.add('bg-yellow-500'); pingIndicatorAnim.classList.add('bg-yellow-400'); statusText.classList.add('text-yellow-400'); }
+        }
+        
+        function updateChart(label, metrics) {
+            const chartData = responseTimeChart.data;
+            chartData.labels.push(label);
+            chartData.datasets[0].data.push(metrics.actual);
+            chartData.datasets[1].data.push(metrics.speed);
+            if (chartData.labels.length > MAX_DATA_POINTS) {
+                chartData.labels.shift();
+                chartData.datasets.forEach(dataset => dataset.data.shift());
+            }
+            responseTimeChart.update();
+        }
+
+        async function checkResponseTime() {
+            const startTime = performance.now();
+            updateStatusIndicator('checking', 'Cek...');
+            totalChecks++;
+            if (totalChecks === 1 || totalChecks % 3 === 0) { checkDownloadSpeed(); }
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+                const response = await fetch(PROXY_URL, { method: 'GET', cache: 'no-cache', signal: controller.signal });
+                clearTimeout(timeoutId);
+                const endTime = performance.now();
+                const timeTaken = Math.round(endTime - startTime);
+                if (!response.ok) throw new Error(`Status: ${response.status}`);
+                responseHistory.push(timeTaken);
+                if (responseHistory.length > MAX_DATA_POINTS * 2) { responseHistory.shift(); }
+                responseTimeText.textContent = timeTaken;
+                updateStatusIndicator('success', 'Online');
+                const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                updateChart(currentTime, { actual: timeTaken, speed: lastKnownSpeed });
+            } catch (error) {
+                totalFails++;
+                let errorMessage = (error.name === 'AbortError') ? 'Timeout' : 'Gagal';
+                responseTimeText.textContent = '---';
+                updateStatusIndicator('error', errorMessage);
+                const currentTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                updateChart(currentTime, { actual: null, speed: lastKnownSpeed });
+            }
+            statChecks.textContent = totalChecks;
+            statFails.textContent = totalFails;
+        }
+
+        // --- WIDGET LOGIC ---
+        const movableWidget = document.getElementById('movable-widget');
+        const widgetHeader = document.getElementById('widget-header');
+        const minimizeBtn = document.getElementById('minimize-btn');
+        const widgetContent = document.getElementById('widget-content');
+        const previewIframe = document.getElementById('preview-iframe');
+        const widgetSpinner = document.getElementById('widget-spinner');
+        const resizeHandle = document.getElementById('resize-handle');
+        const showPreviewBtn = document.getElementById('show-preview-btn');
+        const previewPlaceholder = document.getElementById('preview-placeholder');
+
+        const WIDGET_DEFAULT_WIDTH = 160;
+        const WIDGET_DEFAULT_TOP = 10; 
+        const WIDGET_ASPECT_RATIO = 16 / 9;
+        const WIDGET_RESET_TIMEOUT = 60000;
+        const IFRAME_ORIGINAL_WIDTH = 1024;
+        const IFRAME_RELOAD_INTERVAL = 30000;
+        let isDragging = false, isResizing = false, offsetX, offsetY, inactivityTimer = null;
+        
+        function updateIframeScale() { if (!widgetContent || !previewIframe) return; const scale = widgetContent.offsetWidth / IFRAME_ORIGINAL_WIDTH; previewIframe.style.transform = `scale(${scale})`; }
+        function reloadPreviewIframe() { if (!previewIframe || !widgetSpinner) return; widgetSpinner.classList.remove('hidden'); const newSrc = `https://bukalms.ppspui.workers.dev/?site=${targetSite}&t=${Date.now()}`; previewIframe.src = newSrc; }
+        previewIframe.onload = () => { if (widgetSpinner) widgetSpinner.classList.add('hidden'); };
+
+        if (movableWidget) {
+            previewIframe.src = `https://bukalms.ppspui.workers.dev/?site=${targetSite}`;
+            function showWidget() {
+                previewPlaceholder.classList.add('hidden');
+                movableWidget.classList.remove('hidden');
+                movableWidget.style.top = `${WIDGET_DEFAULT_TOP}px`;
+                movableWidget.style.left = '50%';
+                movableWidget.style.right = 'auto';
+                movableWidget.style.transform = 'translateX(-50%)';
+                movableWidget.style.width = `${WIDGET_DEFAULT_WIDTH}px`;
+                const headerHeight = widgetHeader.offsetHeight || 28;
+                const newContentHeight = WIDGET_DEFAULT_WIDTH / WIDGET_ASPECT_RATIO;
+                const newHeight = newContentHeight + headerHeight;
+                movableWidget.style.height = `${newHeight}px`;
+                widgetContent.style.height = `${newContentHeight}px`;
+                widgetContent.classList.remove('hidden');
+                resizeHandle.classList.remove('hidden');
+                widgetHeader.classList.remove('rounded-lg'); widgetHeader.classList.add('rounded-t-lg');
+                updateIframeScale();
+                startInactivityTimer();
+            }
+            function hideWidget() { movableWidget.classList.add('hidden'); previewPlaceholder.classList.remove('hidden'); clearTimeout(inactivityTimer); }
+            function startInactivityTimer() { clearTimeout(inactivityTimer); inactivityTimer = setTimeout(hideWidget, WIDGET_RESET_TIMEOUT); }
+            showPreviewBtn.addEventListener('click', showWidget);
+            minimizeBtn.addEventListener('click', hideWidget);
+            widgetHeader.addEventListener('mousedown', (e) => { 
+                if (e.target === minimizeBtn || minimizeBtn.contains(e.target) || e.target === resizeHandle) return; 
+                isDragging = true; 
+                movableWidget.style.transform = 'none';
+                const rect = movableWidget.getBoundingClientRect(); 
+                offsetX = e.clientX - rect.left; 
+                offsetY = e.clientY - rect.top; 
+                document.body.classList.add('no-select'); 
+                clearTimeout(inactivityTimer); 
+                e.preventDefault(); 
+            });
+            resizeHandle.addEventListener('mousedown', (e) => { isResizing = true; document.body.classList.add('no-select'); clearTimeout(inactivityTimer); e.preventDefault(); });
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) { const parentRect = movableWidget.parentElement.getBoundingClientRect(); let newX = e.clientX - offsetX - parentRect.left; let newY = e.clientY - offsetY - parentRect.top; newX = Math.max(0, Math.min(newX, parentRect.width - movableWidget.offsetWidth)); newY = Math.max(0, Math.min(newY, parentRect.height - movableWidget.offsetHeight)); movableWidget.style.left = `${newX}px`; movableWidget.style.top = `${newY}px`; movableWidget.style.right = 'auto'; }
+                if (isResizing) { const rect = movableWidget.getBoundingClientRect(); let newWidth = e.clientX - rect.left; newWidth = Math.max(120, newWidth); const headerHeight = widgetHeader.offsetHeight; const newContentHeight = newWidth / WIDGET_ASPECT_RATIO; const newHeight = newContentHeight + headerHeight; movableWidget.style.width = `${newWidth}px`; movableWidget.style.height = `${newHeight}px`; widgetContent.style.height = `${newContentHeight}px`; updateIframeScale(); }
+            });
+            document.addEventListener('mouseup', () => { if (isDragging || isResizing) { startInactivityTimer(); } isDragging = false; isResizing = false; document.body.classList.remove('no-select'); });
+        }
+        
+        // --- INISIALISASI ---
+        checkResponseTime();
+        setInterval(checkResponseTime, CHECK_INTERVAL_MS);
+        if(movableWidget) { movableWidget.classList.add('hidden'); if (previewPlaceholder) previewPlaceholder.classList.remove('hidden'); updateIframeScale(); setInterval(reloadPreviewIframe, IFRAME_RELOAD_INTERVAL); }
+    </script>
+
+</body>
+</html>
+
