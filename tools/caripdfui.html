@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mesin Pencari Kustom</title>
+    <!-- Memuat Tailwind CSS untuk styling modern dan responsif -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Gaya khusus untuk memastikan elemen pencarian Google tampil dengan baik */
+        .gsc-control-cse {
+            padding: 0 !important;
+            width: 100%;
+        }
+        .gsc-results-wrapper-visible {
+            padding-top: 1rem;
+        }
+        /* Menghilangkan border dan membuatnya lebih menyatu dengan desain modern */
+        .gsc-search-button-v2, .gsc-input {
+            border-radius: 0.5rem !important; /* Sudut membulat */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col items-center p-4 font-sans">
+
+    <div class="w-full max-w-4xl bg-white p-8 md:p-10 shadow-xl rounded-xl border border-gray-100 mt-10">
+        
+        <h1 class="text-3xl font-extrabold text-center text-indigo-700 mb-6">
+            Cari PDF di *.ui.ac.id
+        </h1>
+        
+        <!-- SCRIPT GOOGLE PSE UTAMA -->
+        <!-- ID Mesin Pencari Kustom (cx) telah diganti dengan ID yang Anda berikan. -->
+        <script async src="https://cse.google.com/cse.js?cx=f09d60676775c43c7"></script>
+        
+        <!-- Wadah di mana elemen pencarian Google akan dimuat -->
+        <!-- Filter data-as_filetype="pdf" dan data-as_sitesearch="ui.ac.id" kini aktif. -->
+        <div class="gcse-search" data-as_filetype="pdf" data-as_sitesearch="ui.ac.id"></div>
+
+    </div>
+
+    <footer class="mt-8 text-center text-sm text-gray-400">
+        Ditenagai oleh Google Programmable Search Engine. Custom by TAD & Gemini
+    </footer>
+
+    <!-- JavaScript untuk Integrasi Gemini API tidak lagi diperlukan. -->
+</body>
+</html>
