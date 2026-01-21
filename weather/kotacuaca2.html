@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animasi Kota: Infinite Panning</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #2c3e50;
+        }
+        canvas {
+            display: block;
+        }
+        #controls-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 15px;
+            border-radius: 20px;
+            border-left: 4px solid #3498db;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            z-index: 20;
+            backdrop-filter: blur(8px);
+            width: 200px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+        }
+        input[type=range] {
+            width: 100%;
+            margin: 5px 0;
+            cursor: pointer;
+            height: 6px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+            -webkit-appearance: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #f1c40f;
+            cursor: pointer;
+            margin-top: -4px; 
+        }
+        #atmosphereLabel {
+            font-size: 14px;
+            font-weight: bold;
+            color: #f1c40f;
+            text-align: center;
+            margin-bottom: 2px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+        .instruction {
+            font-size: 10px;
+            color: #bdc3c7;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            margin-top: 5px;
+            padding-top: 5px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 30px;
+            height: 16px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 16px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 12px;
+            width: 12px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #2ecc71; }
+        input:checked + .slider:before { transform: translateX(14px); }
+        
+        #loading-text {
+            font-size: 10px;
+            color: #3498db;
+            text-align: center;
+            display: none;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls-panel">
+        <div id="atmosphereLabel">Musim Semi Cerah 🌸</div>
+        <input type="range" id="atmosphereSlider" min="0" max="6" step="1" value="0" oninput="updateAtmosphere()">
+        
+        <div class="toggle-container">
+            <span>Mode Otomatis (Lokasi)</span>
+            <label class="switch">
+                <input type="checkbox" id="autoToggle" onchange="toggleAutoMode()">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div id="loading-text">Mencari lokasi...</div>
+    </div>
+    
+    <canvas id="stormCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('stormCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let groundLevel, sidewalkLevel, riverLevel;
+        
+        // --- CAMERA STATE ---
+        let cameraX = 0;
+        let cameraSpeed = 0.5;
+        
+        // --- TRACKERS FOR GENERATION ---
+        let nextBuildingX = 0;
+        let nextBgLayer1X = -100;
+        let nextBgLayer2X = -100;
+        let nextTreeX = 50;
+        let nextLightX = 100;
+        let nextHawkerX = 300;
+        let nextBusStopX = 800;
+
+        // --- STATUS ATMOSFER ---
+        let season = 'spring';
+        let weather = 'clear';
+        let windSpeed = 1;
+        let skyColorTop = '#3498db';
+        let skyColorBot = '#ecf0f1';
+        let riverColorTop = '#2980b9';
+        let riverColorBot = '#2c3e50';
+        let overlayColor = 'rgba(0,0,0,0)';
+        let lightningChance = 0;
+        let lightningTimer = 0;
+        let flashOpacity = 0;
+        let thunderBolts = [];
+        let isAutoMode = false;
+
+        // --- ENTITY ARRAYS ---
+        const particles = []; 
+        const splashes = [];
+        const clouds = [];
+        
+        const buildings = [];
+        const bgLayer1 = []; 
+        const bgLayer2 = []; 
+        const trees = [];
+        const lights = [];
+        const hawkers = [];
+        const busStops = [];
+        
+        const vehicles = [];
+        const pedestrians = [];
+        const boats = [];
+        const helicopters = [];
+        
+        let monorail, highSpeedTrain;
+        
+        // Timers
+        let vehicleTimer = 0, pedestrianTimer = 0, boatTimer = 0, heliTimer = 0;
+
+        // ==========================================
+        //        1. DEFINISI KELAS (SEMUA)
+        // ==========================================
+
+        class BgBuilding {
+            constructor(x, w, h, color, hasWindows) {
+                this.x = x; this.w = w; this.h = h; this.color = color;
+                this.windows = [];
+                if (hasWindows) {
+                     let rows = h / 20;
+                     let cols = w / 15;
+                     for(let r=1; r<rows; r+=2) {
+                        for(let c=1; c<cols; c+=2) {
+                            if(Math.random() > 0.6) this.windows.push({x: c*15, y: r*20});
+                        }
+                     }
+                }
+            }
+            draw(parallaxFactor) {
+                let drawX = this.x - (cameraX * parallaxFactor);
+                if (drawX < -this.w || drawX > width) return;
+
+                ctx.fillStyle = this.color;
+                ctx.fillRect(drawX, sidewalkLevel - this.h, this.w, this.h);
+                
+                if (this.windows && this.windows.length > 0) {
+                    ctx.fillStyle = 'rgba(200, 200, 200, 0.2)';
+                    for(let w of this.windows) {
+                        if (w.y < this.h) ctx.fillRect(drawX + w.x, sidewalkLevel - this.h + w.y, 8, 12);
+                    }
+                }
+            }
+        }
+
+        class Boat {
+            constructor() {
+                this.type = ['cargo', 'ferry', 'speed', 'canoe'][Math.floor(Math.random()*4)];
+                this.direction = Math.random() > 0.5 ? 1 : -1;
+                this.y = riverLevel + 20 + Math.random() * (height - riverLevel - 40);
+                this.bobOffset = Math.random() * 10;
+                
+                if (this.type === 'cargo') { this.w = 120; this.h = 30; this.speed = 0.5 * this.direction; this.color = '#7f8c8d'; } 
+                else if (this.type === 'ferry') { this.w = 80; this.h = 25; this.speed = 1.2 * this.direction; this.color = '#ecf0f1'; } 
+                else if (this.type === 'speed') { this.w = 40; this.h = 15; this.speed = 3.5 * this.direction; this.color = '#e74c3c'; } 
+                else { this.w = 30; this.h = 10; this.speed = 0.8 * this.direction; this.color = '#d35400'; }
+                
+                this.x = this.direction === 1 ? cameraX - this.w - 50 : cameraX + width + 50;
+            }
+            update() {
+                this.x += this.speed;
+                this.bobOffset += 0.05;
+                if (this.x < cameraX - 300 || this.x > cameraX + width + 300) return true;
+                return false;
+            }
+            draw() {
+                let bob = Math.sin(this.bobOffset) * 2;
+                let drawX = this.x - cameraX;
+                
+                ctx.save();
+                ctx.translate(drawX, this.y + bob);
+                if (this.direction === -1) ctx.scale(-1, 1);
+
+                if (this.type === 'speed') {
+                    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                    ctx.beginPath(); ctx.moveTo(-10, this.h); ctx.lineTo(-60, this.h - 5); ctx.lineTo(-10, this.h + 5); ctx.fill();
+                }
+
+                ctx.fillStyle = this.color;
+                if (this.type === 'canoe') {
+                    ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(this.w/2, this.h*2, this.w, 0); ctx.fill();
+                    ctx.fillStyle = '#222'; ctx.fillRect(this.w/2 - 2, -10, 4, 10);
+                    ctx.beginPath(); ctx.arc(this.w/2, -12, 3, 0, Math.PI*2); ctx.fill();
+                } else {
+                    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(this.w, 0); ctx.lineTo(this.w - 10, this.h); ctx.lineTo(10, this.h); ctx.fill();
+                    if (this.type === 'cargo') {
+                        ctx.fillStyle = '#c0392b'; ctx.fillRect(10, -15, 20, 15); ctx.fillStyle = '#2980b9'; ctx.fillRect(35, -15, 20, 15); ctx.fillStyle = '#f1c40f'; ctx.fillRect(60, -15, 20, 15); ctx.fillStyle = '#ecf0f1'; ctx.fillRect(this.w - 30, -20, 20, 20);
+                    } else if (this.type === 'ferry') {
+                        ctx.fillStyle = '#fff'; ctx.fillRect(10, -15, this.w - 20, 15); ctx.fillStyle = '#3498db'; ctx.fillRect(15, -10, 5, 5); ctx.fillRect(25, -10, 5, 5); ctx.fillRect(35, -10, 5, 5);
+                    }
+                }
+                ctx.restore();
+            }
+        }
+
+        class Tree {
+            constructor(x) {
+                this.x = x;
+                this.seed = Math.random();
+            }
+            draw() {
+                let drawX = this.x - cameraX;
+                if (drawX < -100 || drawX > width + 100) return;
+                let sway = Math.sin(Date.now() / 1000 + this.x) * windSpeed;
+                this.drawBranch(drawX, sidewalkLevel, 50 + (this.seed * 20), 0 + sway, 6);
+            }
+            drawBranch(x, y, len, angle, width) {
+                ctx.beginPath(); ctx.save();
+                ctx.strokeStyle = '#151515'; ctx.lineWidth = width;
+                ctx.translate(x, y); ctx.rotate(angle * Math.PI/180);
+                ctx.moveTo(0,0); ctx.lineTo(0, -len); ctx.stroke();
+
+                if (len < 15) {
+                    let leafColor;
+                    if (season === 'spring') leafColor = 'rgba(255, 183, 197, 0.8)'; 
+                    else if (season === 'summer') leafColor = 'rgba(46, 204, 113, 0.8)'; 
+                    else if (season === 'autumn') leafColor = 'rgba(230, 126, 34, 0.8)'; 
+                    else leafColor = 'rgba(255, 255, 255, 0)'; 
+                    
+                    if (season !== 'winter') {
+                        ctx.fillStyle = leafColor; ctx.beginPath(); ctx.arc(0, -len, 6, 0, Math.PI*2); ctx.fill();
+                    } else if (season === 'winter' && weather === 'snow') {
+                        ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(-3, -len, 6, 3);
+                    }
+                }
+
+                if(len < 10) { ctx.restore(); return; }
+                ctx.translate(0, -len);
+                this.drawBranch(0, 0, len * 0.7, 20 + (angle*0.1), width * 0.7);
+                this.drawBranch(0, 0, len * 0.7, -20 + (angle*0.1), width * 0.7);
+                ctx.restore();
+            }
+        }
+
+        class Building {
+            constructor(x, w, h, type, hasHelipad = false) {
+                this.x = x; this.w = w; this.h = h; this.type = type; this.hasHelipad = hasHelipad;
+                this.windows = [];
+                this.baseColor = type === 'mall' ? '#bdc3c7' : (type === 'apt' ? '#7f8c8d' : '#34495e');
+                let rows = Math.floor(h / 25); let cols = Math.floor(w / 20);
+                for(let r=1; r<rows; r++) {
+                    for(let c=1; c<cols; c++) {
+                        if (Math.random() > 0.1) this.windows.push({ x: (c * 20), y: sidewalkLevel - h + (r * 25), w: 12, h: 18, on: Math.random() > 0.6, timer: Math.random() * 1000 });
+                    }
+                }
+            }
+            update() { for(let w of this.windows) { w.timer--; if(w.timer <= 0) { w.on = !w.on; w.timer = Math.random() * 2000 + 500; } } }
+            draw() {
+                let drawX = this.x - cameraX;
+                if (drawX < -this.w || drawX > width) return;
+
+                let grad = ctx.createLinearGradient(drawX, sidewalkLevel - this.h, drawX + 20, sidewalkLevel);
+                grad.addColorStop(0, this.baseColor); grad.addColorStop(1, '#1a252f');
+                ctx.fillStyle = grad; ctx.fillRect(drawX, sidewalkLevel - this.h, this.w, this.h);
+                ctx.fillStyle = '#2c3e50'; ctx.fillRect(drawX - 5, sidewalkLevel - this.h, this.w + 10, 5);
+                for(let w of this.windows) {
+                    if (w.on) { ctx.fillStyle = 'rgba(255, 240, 200, 0.6)'; ctx.shadowColor = "orange"; ctx.shadowBlur = 2; ctx.fillRect(drawX + w.x, w.y, w.w, w.h); ctx.shadowBlur = 0; } 
+                    else { ctx.fillStyle = '#151b21'; ctx.fillRect(drawX + w.x, w.y, w.w, w.h); ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.beginPath(); ctx.moveTo(drawX + w.x, w.y); ctx.lineTo(drawX + w.x+w.w, w.y+w.h/2); ctx.lineTo(drawX + w.x, w.y+w.h); ctx.fill(); }
+                }
+                if(this.type === 'mall') { ctx.fillStyle = '#e74c3c'; ctx.font = 'bold 16px sans-serif'; ctx.fillText("PLAZA", drawX + 20, sidewalkLevel - this.h + 20); }
+                if (this.hasHelipad) {
+                    ctx.save(); ctx.translate(drawX + this.w/2, sidewalkLevel - this.h); ctx.scale(1, 0.3); 
+                    ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(0, 0, 30, 0, Math.PI*2); ctx.fill();
+                    ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 25, 0, Math.PI*2); ctx.stroke();
+                    ctx.fillStyle = '#f1c40f'; ctx.font = 'bold 30px Arial'; ctx.textAlign = 'center'; ctx.fillText('H', 0, 10);
+                    ctx.restore();
+                }
+            }
+        }
+
+        class BusStop {
+            constructor(x) { this.x = x; this.y = sidewalkLevel; this.w = 120; this.h = 60; }
+            draw() {
+                let drawX = this.x - cameraX;
+                if (drawX < -this.w || drawX > width) return;
+                ctx.fillStyle = '#34495e'; ctx.beginPath(); ctx.moveTo(drawX, this.y - this.h); ctx.lineTo(drawX + this.w, this.y - this.h - 10); ctx.lineTo(drawX + this.w + 10, this.y - this.h + 5); ctx.lineTo(drawX - 10, this.y - this.h + 5); ctx.fill();
+                ctx.fillStyle = '#2c3e50'; ctx.fillRect(drawX + 10, this.y - this.h, 10, this.h); ctx.fillRect(drawX + this.w - 20, this.y - this.h, 10, this.h);
+                ctx.fillStyle = 'rgba(100, 150, 200, 0.3)'; ctx.fillRect(drawX + 20, this.y - this.h + 10, this.w - 40, this.h - 20);
+                ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(drawX - 15, this.y - this.h, 10, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = 'black'; ctx.font = 'bold 10px Arial'; ctx.fillText('BUS', drawX - 24, this.y - this.h + 4);
+                ctx.fillStyle = '#7f8c8d'; ctx.fillRect(drawX - 17, this.y - this.h, 4, this.h);
+            }
+        }
+
+        class Helicopter {
+            constructor() {
+                this.x = cameraX - 100; this.y = Math.random() * 100 + 50; this.state = 'flying';
+                this.targetBuilding = null;
+                let pads = buildings.filter(b => b.hasHelipad && b.x > cameraX && b.x < cameraX + width);
+                if (pads.length > 0 && Math.random() > 0.5) {
+                    this.targetBuilding = pads[0]; this.landingX = this.targetBuilding.x + this.targetBuilding.w/2; this.landingY = sidewalkLevel - this.targetBuilding.h - 15; this.state = 'landing';
+                }
+                this.speedX = 3 + cameraSpeed; 
+                this.speedY = 0; this.waitTimer = 0; this.rotorAngle = 0;
+            }
+            update() {
+                this.rotorAngle += 0.8;
+                if (this.state === 'flying') this.x += this.speedX;
+                else if (this.state === 'landing') {
+                    let dx = this.landingX - this.x; let dy = this.landingY - this.y;
+                    if (Math.abs(dx) > 5) this.x += (dx > 0 ? 2 : -2) + cameraSpeed;
+                    else { if (dy > 2) this.y += 1; else { this.state = 'landed'; this.waitTimer = 300; } }
+                } else if (this.state === 'landed') { 
+                    this.x += 0; 
+                    this.waitTimer--; if (this.waitTimer <= 0) this.state = 'takingoff'; 
+                } 
+                else if (this.state === 'takingoff') { this.y -= 1.5; if (this.y < 50) this.state = 'flying'; }
+                return this.x > cameraX + width + 200;
+            }
+            draw() {
+                let drawX = this.x - cameraX;
+                ctx.save(); ctx.translate(drawX, this.y);
+                if(this.state === 'landed') ctx.rotate(0); else ctx.rotate(0.1);
+                ctx.fillStyle = '#34495e'; ctx.beginPath(); ctx.ellipse(0, 0, 30, 15, 0, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#2c3e50'; ctx.fillRect(-45, -5, 25, 5); ctx.fillRect(-48, -10, 5, 15);
+                ctx.fillStyle = 'rgba(135, 206, 235, 0.8)'; ctx.beginPath(); ctx.arc(10, 0, 12, 0, Math.PI*2, true); ctx.fill();
+                ctx.strokeStyle = '#222'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-10, 10); ctx.lineTo(-10, 18); ctx.lineTo(15, 18); ctx.moveTo(10, 10); ctx.lineTo(10, 18); ctx.stroke();
+                ctx.fillStyle = 'rgba(20, 20, 20, 0.8)'; let bladeW = Math.sin(this.rotorAngle) * 70; ctx.fillRect(-35, -15, 70, 2); ctx.fillRect(-bladeW/2, -18, bladeW, 4);
+                if (this.state !== 'landed') { ctx.fillStyle = Math.random() > 0.5 ? 'red' : 'rgba(0,0,0,0)'; ctx.beginPath(); ctx.arc(-48, -12, 2, 0, Math.PI*2); ctx.fill(); }
+                ctx.restore();
+            }
+        }
+
+        class MonorailTrain {
+            constructor(y, direction) { this.y = y - 22; this.direction = direction; this.w = 250; this.h = 24; this.x = direction === 1 ? -this.w : width + this.w; this.speed = 3 * direction; }
+            update() { this.x += this.speed; }
+            draw() {
+                let drawX = this.x - cameraX;
+                ctx.save(); ctx.fillStyle = '#ecf0f1'; let carW = this.w / 3; let gap = 2;
+                for(let i=0; i<3; i++) {
+                    let carX = drawX + (i * (carW - gap)); ctx.fillStyle = '#ecf0f1'; ctx.fillRect(carX, this.y, carW - gap, this.h);
+                    ctx.fillStyle = 'rgba(100, 200, 255, 0.8)'; ctx.fillRect(carX + 5, this.y + 5, carW - 15, 8); ctx.fillStyle = '#e74c3c'; ctx.fillRect(carX, this.y + 15, carW - gap, 2);
+                }
+                ctx.globalCompositeOperation = 'screen'; let beamLen = 150; let headX = this.direction === 1 ? drawX + this.w - 10 : drawX + 10;
+                let grad = ctx.createLinearGradient(drawX, this.y, drawX + (beamLen * this.direction), this.y);
+                grad.addColorStop(0, 'rgba(200, 255, 255, 0.5)'); grad.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = grad;
+                ctx.beginPath(); if (this.direction === 1) { ctx.moveTo(headX, this.y + 5); ctx.lineTo(headX + beamLen, this.y + 30); ctx.lineTo(headX, this.y + 15); } else { ctx.moveTo(headX, this.y + 5); ctx.lineTo(headX - beamLen, this.y + 30); ctx.lineTo(headX, this.y + 15); }
+                ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(headX, this.y + 10, 2, 0, Math.PI*2); ctx.fill(); ctx.restore();
+            }
+        }
+
+        class MonorailSystem {
+            constructor(y) { this.y = y; this.train = null; this.timer = 100; this.pillarSpacing = 200; }
+            update() {
+                if (this.train) {
+                    this.train.update();
+                    let drawX = this.train.x - cameraX;
+                    if ((this.train.direction === 1 && drawX > width + 100) || (this.train.direction === -1 && drawX < -this.train.w - 100)) { this.train = null; this.timer = 500 + Math.random() * 500; }
+                } else { this.timer--; if (this.timer <= 0) this.spawnTrain(); }
+            }
+            spawnTrain() { let dir = Math.random() > 0.5 ? 1 : -1; let spawnX = dir === 1 ? cameraX - 400 : cameraX + width + 400; this.train = new MonorailTrain(this.y, dir); this.train.x = spawnX; }
+            drawTrack() {
+                let offsetX = cameraX % 200;
+                ctx.fillStyle = '#34495e'; for (let x = -200; x < width + 200; x += this.pillarSpacing) ctx.fillRect(x - offsetX, this.y, 20, sidewalkLevel - this.y);
+                ctx.fillStyle = '#2c3e50'; ctx.fillRect(0, this.y, width, 15); ctx.fillStyle = '#1a252f'; ctx.fillRect(0, this.y + 15, width, 5);
+                ctx.fillStyle = '#5dade2'; for(let i=0; i<width; i+=40) ctx.fillRect(i - (cameraX%40), this.y + 5, 4, 4);
+            }
+            drawTrain() { if (this.train) this.train.draw(); }
+        }
+
+        class HighSpeedTrain {
+            constructor(y, dir) { this.y = y - 25; this.dir = dir; this.w = 500; this.h = 25; this.x = dir===1 ? -this.w : width + this.w; this.speed = 20 * dir; }
+            update() { this.x += this.speed; }
+            draw() {
+                let drawX = this.x - cameraX;
+                ctx.save(); ctx.fillStyle = '#fff'; ctx.beginPath();
+                if(this.dir === 1) { ctx.moveTo(drawX, this.y); ctx.lineTo(drawX + this.w, this.y); ctx.quadraticCurveTo(drawX + this.w + 60, this.y + 12, drawX + this.w, this.y + this.h); ctx.lineTo(drawX, this.y + this.h); } 
+                else { ctx.moveTo(drawX + this.w, this.y); ctx.lineTo(drawX, this.y); ctx.quadraticCurveTo(drawX - 60, this.y + 12, drawX, this.y + this.h); ctx.lineTo(drawX + this.w, this.y + this.h); }
+                ctx.fill(); ctx.fillStyle = '#222'; ctx.fillRect(drawX + 20, this.y + 8, this.w - 40, 8);
+                ctx.fillStyle = '#3498db'; ctx.fillRect(drawX, this.y + 18, this.w, 4); ctx.restore();
+            }
+        }
+
+        class HighSpeedTrainSystem {
+            constructor(y) { this.y = y; this.train = null; this.timer = 200; }
+            update() {
+                if (this.train) { this.train.update(); let drawX = this.train.x - cameraX; if (drawX > width + 1000 || drawX < -1000) { this.train = null; this.timer = 300 + Math.random()*300; } } 
+                else { this.timer--; if(this.timer<=0) { let dir = Math.random() > 0.5 ? 1 : -1; let spawnX = dir === 1 ? cameraX - 600 : cameraX + width + 600; this.train = new HighSpeedTrain(this.y, dir); this.train.x = spawnX; } }
+            }
+            drawTrack() {
+                let offsetX = cameraX % 300;
+                ctx.fillStyle = '#bdc3c7'; for(let x=-300; x<width+300; x+=300) ctx.fillRect(x - offsetX, this.y, 25, sidewalkLevel - this.y);
+                ctx.fillStyle = '#ecf0f1'; ctx.fillRect(0, this.y, width, 20); ctx.fillStyle = '#bdc3c7'; ctx.fillRect(0, this.y+15, width, 5);
+            }
+            drawTrain() { if(this.train) this.train.draw(); }
+        }
+
+        class Cloud {
+            constructor() { 
+                this.x = Math.random() * width; 
+                this.y = Math.random() * (height * 0.2); 
+                this.speed = Math.random() * 0.1 + 0.05; 
+                this.puffs = []; 
+                let puffCount = 8 + Math.random() * 5; 
+                for(let i=0; i<puffCount; i++) {
+                    this.puffs.push({
+                        dx: Math.random()*120-60, 
+                        dy: Math.random()*40-20, 
+                        r: 25+Math.random()*25
+                    });
+                }
+            }
+            update() { 
+                this.x += this.speed; 
+                if(this.x > width + 150) this.x = -150; 
+            }
+            draw() {
+                ctx.save(); 
+                ctx.translate(this.x, this.y);
+                for(let p of this.puffs) { 
+                    let grad = ctx.createRadialGradient(p.dx, p.dy, 0, p.dx, p.dy, p.r);
+                    if (weather === 'rain' || weather === 'storm') {
+                        grad.addColorStop(0, 'rgba(100, 100, 110, 0.9)');
+                        grad.addColorStop(1, 'rgba(100, 100, 110, 0)');
+                    } else {
+                        grad.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+                        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                    }
+                    ctx.fillStyle = grad;
+                    ctx.beginPath(); ctx.arc(p.dx, p.dy, p.r, 0, Math.PI*2); ctx.fill(); 
+                }
+                ctx.restore();
+            }
+        }
+
+        class Pedestrian {
+            constructor() {
+                this.direction = Math.random() > 0.5 ? 1 : -1; 
+                this.x = this.direction === 1 ? cameraX - 50 : cameraX + width + 50;
+                this.y = sidewalkLevel;
+                this.speed = (0.5 + Math.random()) * this.direction;
+                this.color = ['#e74c3c', '#f1c40f', '#9b59b6', '#2ecc71', '#ecf0f1'][Math.floor(Math.random()*5)];
+                this.walkFrame = 0; this.updateProps();
+            }
+            updateProps() { 
+                this.hasUmbrella = (weather === 'rain' || weather === 'storm');
+                this.hasScarf = (season === 'winter' || weather === 'snow');
+                this.umbrellaColor = ['#333', '#555', '#222', '#444'][Math.floor(Math.random()*4)]; 
+            }
+            update() { 
+                this.x += this.speed; this.walkFrame += 0.15; 
+                if (this.x < cameraX - 200 || this.x > cameraX + width + 200) return true; 
+                return false;
+            }
+            draw() {
+                let drawX = this.x - cameraX;
+                let bob = Math.sin(this.walkFrame) * 2;
+                ctx.fillStyle = '#222'; ctx.fillRect(drawX, this.y - 15, 3, 15); 
+                ctx.fillStyle = this.color; ctx.fillRect(drawX - 3, this.y - 30 + bob, 9, 18);
+                ctx.fillStyle = '#f1c40f'; ctx.beginPath(); ctx.arc(drawX + 1.5, this.y - 32 + bob, 3, 0, Math.PI*2); ctx.fill();
+                if (this.hasUmbrella) {
+                    ctx.fillStyle = this.umbrellaColor; ctx.beginPath(); ctx.arc(drawX + 1.5, this.y - 32 + bob, 12, Math.PI, 0); ctx.fill();
+                    ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(drawX + 1.5, this.y - 25 + bob); ctx.lineTo(drawX + 1.5, this.y - 35 + bob); ctx.stroke();
+                } 
+                if (this.hasScarf) { ctx.fillStyle = '#e74c3c'; ctx.fillRect(drawX - 2, this.y - 25 + bob, 7, 3); }
+            }
+        }
+
+        class Vehicle {
+            constructor() {
+                this.type = Math.random() > 0.7 ? 'car' : (Math.random() > 0.5 ? 'bike' : 'bus');
+                this.direction = 1; 
+                this.x = cameraX - 150; 
+                this.speed = (3 + Math.random() * 2);
+                this.color = ['#ecf0f1', '#e74c3c', '#3498db'][Math.floor(Math.random()*3)];
+                if(this.type === 'bus') { this.speed *= 0.8; this.color = '#f1c40f'; }
+                if(this.type === 'bike') { this.speed *= 1.5; this.color = '#222'; }
+                this.y = groundLevel - 5; if (this.type === 'bus') this.y -= 20; 
+            }
+            update() { 
+                this.x += this.speed; 
+                if(Math.random() > 0.3 && weather === 'rain' && this.speed > 1) splashes.push(new Splash(this.x - cameraX + (this.type==='bike'?15:5), groundLevel, true)); 
+                return this.x > cameraX + width + 200;
+            }
+            draw() {
+                let drawX = this.x - cameraX;
+                ctx.save();
+                if(this.type === 'car') { ctx.fillStyle = this.color; ctx.fillRect(drawX, this.y - 15, 60, 20); ctx.fillStyle = '#2c3e50'; ctx.fillRect(drawX + 5, this.y - 22, 50, 10); }
+                else if (this.type === 'bus') { ctx.fillStyle = this.color; ctx.fillRect(drawX, this.y - 25, 120, 45); ctx.fillStyle = '#34495e'; ctx.fillRect(drawX + 5, this.y - 20, 110, 15); }
+                else { ctx.fillStyle = this.color; ctx.fillRect(drawX, this.y - 10, 30, 15); ctx.fillStyle = '#d35400'; ctx.beginPath(); ctx.arc(drawX + 15, this.y - 15, 6, 0, Math.PI*2); ctx.fill(); }
+                ctx.globalCompositeOperation = 'screen'; let beamLen = this.type === 'bike' ? 80 : 120;
+                let grad = ctx.createLinearGradient(drawX, this.y, drawX + beamLen, this.y);
+                grad.addColorStop(0, 'rgba(255, 255, 200, 0.6)'); grad.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = grad; 
+                ctx.beginPath(); ctx.moveTo(drawX + (this.type==='bike'?30:60), this.y); ctx.lineTo(drawX + (this.type==='bike'?30:60) + beamLen, this.y + 20); ctx.lineTo(drawX + (this.type==='bike'?30:60), this.y - 10); ctx.fill(); 
+                ctx.fillStyle = 'rgba(255,0,0,0.8)'; ctx.fillRect(drawX, this.y-5, 2, 5); ctx.restore();
+            }
+        }
+
+        class Hawker {
+            constructor(x) { this.x = x; this.y = sidewalkLevel; this.type = Math.random() > 0.4 ? 'tenda' : 'gerobak'; this.color = this.type === 'tenda' ? (Math.random() > 0.5 ? '#d35400' : '#2980b9') : '#8e44ad'; this.width = this.type === 'tenda' ? 70 : 40; this.height = this.type === 'tenda' ? 45 : 30; this.lightFlicker = 0; }
+            draw() {
+                let drawX = this.x - cameraX; if (drawX < -100 || drawX > width + 100) return;
+                ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(drawX + 5, this.y, this.width - 10, 5);
+                if (this.type === 'tenda') {
+                    ctx.fillStyle = this.color; ctx.beginPath(); ctx.moveTo(drawX, this.y); ctx.lineTo(drawX + 5, this.y - this.height); ctx.lineTo(drawX + this.width - 5, this.y - this.height); ctx.lineTo(drawX + this.width, this.y); ctx.fill();
+                    ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(drawX + this.width/2, this.y); ctx.lineTo(drawX + this.width/2, this.y - this.height); ctx.stroke();
+                    ctx.fillStyle = '#ecf0f1'; ctx.fillRect(drawX + 2, this.y - 15, this.width - 4, 12);
+                } else {
+                    ctx.fillStyle = '#795548'; ctx.fillRect(drawX, this.y - this.height, this.width, this.height);
+                    ctx.fillStyle = 'rgba(200, 240, 255, 0.3)'; ctx.fillRect(drawX + 2, this.y - this.height + 2, this.width - 4, this.height/2);
+                    ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(this.x + 10, this.y, 8, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(this.x + this.width - 10, this.y, 8, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#95a5a6'; ctx.beginPath(); ctx.moveTo(drawX - 5, this.y - this.height); ctx.lineTo(drawX + this.width + 5, this.y - this.height); ctx.lineTo(drawX + this.width/2, this.y - this.height - 10); ctx.fill();
+                }
+                this.lightFlicker++; let intensity = Math.sin(this.lightFlicker * 0.5) * 0.1 + 0.9;
+                ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.fillStyle = `rgba(255, 220, 100, ${0.6 * intensity})`; ctx.beginPath(); ctx.arc(drawX + this.width/2, this.y - this.height/2, 20, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(drawX + this.width/2, this.y - this.height + 10, 2, 0, Math.PI*2); ctx.fill(); ctx.restore();
+            }
+        }
+
+        class StreetLight {
+            constructor(x) { this.x = x; this.y = sidewalkLevel; this.h = 160; }
+            draw() {
+                let drawX = this.x - cameraX; if (drawX < -50 || drawX > width + 50) return;
+                ctx.fillStyle = '#222'; ctx.fillRect(drawX - 2, this.y - this.h, 4, this.h);
+                ctx.beginPath(); ctx.moveTo(drawX, this.y - this.h); ctx.lineTo(drawX + 30, this.y - this.h - 5); ctx.strokeStyle = '#222'; ctx.lineWidth = 3; ctx.stroke();
+                ctx.save(); ctx.globalCompositeOperation = 'screen';
+                let grad = ctx.createRadialGradient(drawX + 30, this.y - this.h - 5, 2, drawX + 30, this.y, 120);
+                grad.addColorStop(0, 'rgba(255, 240, 200, 0.4)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = grad; ctx.beginPath(); ctx.moveTo(drawX + 30, this.y - this.h - 5); ctx.lineTo(drawX - 40, this.y); ctx.lineTo(drawX + 100, this.y); ctx.fill(); ctx.restore();
+            }
+        }
+
+        class Particle { 
+            constructor(type) { this.type = type; this.reset(); }
+            reset() {
+                this.x = Math.random() * width; this.y = Math.random() * -height; this.z = Math.random() * 0.8 + 0.2; 
+                this.sway = Math.random() * 100;
+                if (this.type === 'rain') { this.speed = (15 + Math.random() * 5) * this.z; this.len = Math.random() * 20 + 10; } 
+                else if (this.type === 'snow') { this.speed = (1 + Math.random() * 2) * this.z; this.size = Math.random() * 2 * this.z; }
+                else if (this.type === 'sand') { this.speed = (15 + Math.random() * 10) * this.z; this.x = -Math.random()*width; this.y = Math.random() * height; this.size = Math.random() * 2; }
+                else if (this.type === 'fog') { this.speed = 0.5 * this.z; this.size = Math.random() * 50 + 20; this.y = Math.random() * height; }
+            }
+            update() {
+                if (this.type === 'rain') { this.x -= (windSpeed - cameraSpeed*0.1); this.y += this.speed; } 
+                else if (this.type === 'snow') { this.sway += 0.05; this.x += Math.sin(this.sway) * 0.5 - (cameraSpeed * 0.1); this.y += this.speed; }
+                else if (this.type === 'sand') { this.x += this.speed; this.y += (Math.random()-0.5); }
+                else if (this.type === 'fog') { this.x += this.speed; }
+
+                if (this.x < 0) this.x = width; if (this.x > width) this.x = 0;
+                if (this.y > height) this.reset();
+                if (this.y > groundLevel && this.type === 'rain') { splashes.push(new Splash(this.x, groundLevel, false)); this.reset(); }
+            }
+            draw() {
+                if (this.type === 'rain') { ctx.strokeStyle = `rgba(200, 210, 230, ${0.3 * this.z})`; ctx.lineWidth = 1 * this.z; ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(this.x - windSpeed, this.y - this.len); ctx.stroke(); } 
+                else if (this.type === 'snow') { ctx.fillStyle = `rgba(255, 255, 255, ${0.6 * this.z})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill(); }
+                else if (this.type === 'sand') { ctx.fillStyle = `rgba(194, 178, 128, ${0.6 * this.z})`; ctx.fillRect(this.x, this.y, this.size*2, 1); }
+                else if (this.type === 'fog') { ctx.fillStyle = `rgba(255, 255, 255, ${0.05 * this.z})`; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill(); }
+            }
+        }
+
+        class Splash {
+            constructor(x, y, isBig) { this.x = x; this.y = y; this.vx = (Math.random() - 0.5) * 4; this.vy = (Math.random() * -3) - 1; this.life = isBig ? 15 : 8; }
+            update() { this.x += this.vx; this.y += this.vy; this.vy += 0.5; this.life--; }
+            draw() { ctx.fillStyle = `rgba(200,220,255,${this.life/15})`; ctx.fillRect(this.x, this.y, 2, 2); }
+        }
+
+        // ==========================================
+        //        2. FUNGSI UTAMA (INIT & LOGIC)
+        // ==========================================
+
+        function updateAtmosphere() {
+            const val = parseInt(document.getElementById('atmosphereSlider').value);
+            const label = document.getElementById('atmosphereLabel');
+            lightningChance = 0; windSpeed = 1; particles.length = 0;
+
+            switch(val) {
+                case 0: season = 'spring'; weather = 'clear'; label.innerText = "Musim Semi Cerah 🌸"; skyColorTop='#3498db'; skyColorBot='#87ceeb'; riverColorTop='#3498db'; overlayColor='rgba(0,0,0,0)'; break;
+                case 1: season = 'summer'; weather = 'heatwave'; label.innerText = "Gelombang Panas ☀️"; skyColorTop='#e74c3c'; skyColorBot='#f1c40f'; riverColorTop='#2980b9'; overlayColor='rgba(255,100,0,0.15)'; windSpeed=0.1; break;
+                case 2: season = 'autumn'; weather = 'rain'; label.innerText = "Hujan Musim Gugur 🍂"; skyColorTop='#2c3e50'; skyColorBot='#bdc3c7'; riverColorTop='#546e7a'; overlayColor='rgba(0,0,10,0.2)'; windSpeed=2; initParticles('rain', 800); break;
+                case 3: season = 'winter'; weather = 'snow'; label.innerText = "Badai Salju ❄️"; skyColorTop='#7f8c8d'; skyColorBot='#ecf0f1'; riverColorTop='#90a4ae'; overlayColor='rgba(255,255,255,0.1)'; windSpeed=0.5; initParticles('snow', 900); break;
+                case 4: season = 'summer'; weather = 'storm'; label.innerText = "Badai Petir ⛈️"; skyColorTop='#050505'; skyColorBot='#2c3e50'; riverColorTop='#1c2833'; overlayColor='rgba(0,0,10,0.5)'; windSpeed=5; lightningChance=0.03; initParticles('rain', 1500); break;
+                case 5: season = 'spring'; weather = 'fog'; label.innerText = "Kabut Tebal 🌫️"; skyColorTop='#95a5a6'; skyColorBot='#ecf0f1'; riverColorTop='#7f8c8d'; overlayColor='rgba(220,230,240,0.7)'; windSpeed=0.2; initParticles('fog', 400); break;
+                case 6: season = 'summer'; weather = 'sandstorm'; label.innerText = "Badai Pasir 🏜️"; skyColorTop='#d35400'; skyColorBot='#f39c12'; riverColorTop='#d35400'; overlayColor='rgba(194,178,128,0.5)'; windSpeed=10; initParticles('sand', 1500); break;
+            }
+            pedestrians.forEach(p => p.updateProps());
+        }
+
+        function initParticles(type, count) { for(let i=0; i<count; i++) particles.push(new Particle(type)); }
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            riverLevel = height - 120;
+            groundLevel = riverLevel - 60;
+            sidewalkLevel = groundLevel - 15;
+            initWorld();
+            updateAtmosphere(); 
+        }
+
+        function initWorld() {
+            // Reset Arrays
+            buildings.length=0; bgLayer1.length=0; bgLayer2.length=0; trees.length=0; lights.length=0; hawkers.length=0; busStops.length=0;
+            cameraX = 0;
+            nextBuildingX = 0; nextTreeX = 50; nextLightX = 100; nextHawkerX = 300; nextBusStopX = 800;
+            nextBgLayer1X = -100; nextBgLayer2X = -100;
+
+            monorail = new MonorailSystem(sidewalkLevel - 200);
+            highSpeedTrain = new HighSpeedTrainSystem(sidewalkLevel - 350);
+            
+            // Generate Initial World (Filling screen + buffer)
+            spawnObjects();
+            
+            clouds.length = 0; for(let i=0; i<5; i++) clouds.push(new Cloud());
+        }
+
+        function spawnObjects() {
+            // Background Layer 1 (Far - Slow Parallax)
+            while (nextBgLayer1X < (cameraX * 0.2) + width + 200) {
+                let w = 100 + Math.random() * 200;
+                bgLayer1.push(new BgBuilding(nextBgLayer1X, w, 200 + Math.random()*200, '#1f2a36', Math.random()>0.3));
+                nextBgLayer1X += w - 5;
+            }
+            // Background Layer 2 (Mid - Med Parallax)
+            while (nextBgLayer2X < (cameraX * 0.5) + width + 200) {
+                let w = 80 + Math.random() * 150;
+                bgLayer2.push(new BgBuilding(nextBgLayer2X, w, 150 + Math.random()*150, '#2c3e50', Math.random()>0.3));
+                nextBgLayer2X += w - 5;
+            }
+            // Foreground Buildings
+            while (nextBuildingX < cameraX + width + 300) {
+                let w = 150 + Math.random() * 150;
+                let h = 200 + Math.random() * 200;
+                let type = ['office', 'apt', 'mall'][Math.floor(Math.random()*3)];
+                buildings.push(new Building(nextBuildingX, w, h, type, Math.random()>0.7));
+                nextBuildingX += w + 20 + Math.random() * 50; // Jarak antar gedung
+            }
+            // Trees
+            while (nextTreeX < cameraX + width + 100) {
+                trees.push(new Tree(nextTreeX));
+                nextTreeX += 100 + Math.random() * 150;
+            }
+            // Lights
+            while (nextLightX < cameraX + width + 100) {
+                lights.push(new StreetLight(nextLightX));
+                nextLightX += 250;
+            }
+            // Hawkers
+            while (nextHawkerX < cameraX + width + 100) {
+                hawkers.push(new Hawker(nextHawkerX));
+                nextHawkerX += 400 + Math.random() * 600;
+            }
+            // Bus Stops
+            while (nextBusStopX < cameraX + width + 100) {
+                busStops.push(new BusStop(nextBusStopX));
+                nextBusStopX += 1200 + Math.random() * 1000;
+            }
+        }
+
+        function removeOffscreen() {
+            // Remove objects far to the left
+            if (bgLayer1.length > 0 && bgLayer1[0].x < (cameraX * 0.2) - 500) bgLayer1.shift();
+            if (bgLayer2.length > 0 && bgLayer2[0].x < (cameraX * 0.5) - 500) bgLayer2.shift();
+            if (buildings.length > 0 && buildings[0].x < cameraX - 500) buildings.shift();
+            if (trees.length > 0 && trees[0].x < cameraX - 100) trees.shift();
+            if (lights.length > 0 && lights[0].x < cameraX - 100) lights.shift();
+        }
+
+        function triggerLightning() {
+            if (Math.random() > lightningChance) return; 
+            flashOpacity = 0.4;
+            let startX = Math.random() * width;
+            let bolt = [];
+            let curr = {x: startX, y: 0};
+            let limitY = sidewalkLevel - 300; 
+            while(curr.y < limitY) {
+                bolt.push({...curr});
+                curr.y += Math.random() * 20 + 10;
+                curr.x += (Math.random() - 0.5) * 60;
+            }
+            thunderBolts.push({path: bolt, life: 5});
+        }
+
+        function animate() {
+            cameraX += cameraSpeed;
+            spawnObjects();
+            removeOffscreen();
+
+            if (lightningTimer <= 0) { triggerLightning(); lightningTimer = Math.random() * 300 + 100; } else lightningTimer--;
+            if (vehicleTimer <= 0) { if (Math.random() < 0.03) { vehicles.push(new Vehicle()); vehicleTimer = 80; } } else vehicleTimer--;
+            if (pedestrianTimer <= 0) { if (Math.random() < 0.03) { pedestrians.push(new Pedestrian()); pedestrianTimer = 60; } } else pedestrianTimer--;
+            if (heliTimer <= 0) { if (Math.random() < 0.01) { helicopters.push(new Helicopter()); heliTimer = 500; } } else heliTimer--;
+            if (boatTimer <= 0) { if (Math.random() < 0.01) { boats.push(new Boat()); boatTimer = 200; } } else boatTimer--;
+
+            monorail.update();
+            highSpeedTrain.update();
+
+            // --- DRAWING ---
+            let skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+            skyGrad.addColorStop(0, skyColorTop); skyGrad.addColorStop(1, skyColorBot);
+            ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, width, height);
+
+            // Layering Order:
+            // 1. Sky & Clouds (Backmost)
+            clouds.forEach(c => { c.update(); c.draw(); });
+
+            // 2. Cityscape Layers
+            bgLayer1.forEach(b => b.draw(0.2));
+            bgLayer2.forEach(b => b.draw(0.5));
+
+            // 3. Trains
+            highSpeedTrain.drawTrack(); highSpeedTrain.drawTrain();
+            monorail.drawTrack(); monorail.drawTrain();
+
+            // 4. Air Vehicles
+            for(let i=helicopters.length-1; i>=0; i--) { let remove = helicopters[i].update(); helicopters[i].draw(); if(remove) helicopters.splice(i, 1); }
+
+            // 5. Lightning
+            if (flashOpacity > 0) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${flashOpacity})`; ctx.fillRect(0, 0, width, height); flashOpacity -= 0.05;
+            }
+            ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.shadowBlur = 10; ctx.shadowColor = "white";
+            for(let i=thunderBolts.length-1; i>=0; i--) {
+                let b = thunderBolts[i]; ctx.beginPath(); ctx.moveTo(b.path[0].x, b.path[0].y); for(let p of b.path) ctx.lineTo(p.x, p.y); ctx.stroke(); b.life--; if(b.life<=0) thunderBolts.splice(i,1);
+            }
+            ctx.shadowBlur = 0;
+
+            // 6. Ground & River
+            // Sidewalk
+            ctx.fillStyle = '#7f8c8d'; ctx.fillRect(0, sidewalkLevel, width, groundLevel - sidewalkLevel);
+            // Road
+            ctx.fillStyle = (weather === 'snow' || season === 'winter') ? '#95a5a6' : '#34495e'; 
+            ctx.fillRect(0, groundLevel, width, riverLevel - groundLevel);
+            // Road markings scroll
+            ctx.fillStyle = '#fff';
+            let markOffset = cameraX % 100;
+            for(let i=-100; i<width+100; i+=100) ctx.fillRect(i - markOffset, groundLevel + 25, 40, 4);
+
+            // River
+            let riverGrad = ctx.createLinearGradient(0, riverLevel, 0, height);
+            riverGrad.addColorStop(0, riverColorTop); riverGrad.addColorStop(1, riverColorBot);
+            ctx.fillStyle = riverGrad; ctx.fillRect(0, riverLevel, width, height - riverLevel);
+            
+            // River railing (Scrolls)
+            ctx.fillStyle = '#2c3e50'; ctx.fillRect(0, riverLevel - 5, width, 5); 
+            ctx.fillStyle = '#95a5a6';
+            let railOffset = cameraX % 40;
+            for(let i=-40; i<width+40; i+=40) ctx.fillRect(i - railOffset, riverLevel - 15, 5, 15); 
+            ctx.fillRect(0, riverLevel - 15, width, 3); 
+
+            // 7. Foreground Objects
+            buildings.forEach(b => b.draw());
+            busStops.forEach(b => b.draw());
+            hawkers.forEach(h => h.draw());
+            lights.forEach(l => l.draw());
+            trees.forEach(t => t.draw());
+
+            pedestrians.forEach((p, i) => { let remove = p.update(); p.draw(); if (remove) pedestrians.splice(i, 1); });
+            vehicles.forEach((v, i) => { let remove = v.update(); v.draw(); if (remove) vehicles.splice(i, 1); });
+            for(let i=boats.length-1; i>=0; i--) { let remove = boats[i].update(); boats[i].draw(); if(remove) boats.splice(i, 1); }
+
+            // 8. Weather Effects
+            splashes.forEach((s, i) => { s.update(); s.draw(); if(s.life<=0) splashes.splice(i,1); });
+            particles.forEach(p => { p.update(); p.draw(); });
+
+            // 9. Overlay
+            ctx.fillStyle = overlayColor; ctx.fillRect(0,0,width,height);
+            if (weather === 'heatwave') { let heatPulse = Math.abs(Math.sin(Date.now() / 1000)) * 0.1; ctx.fillStyle = `rgba(255, 100, 0, ${heatPulse})`; ctx.fillRect(0,0,width,height); }
+
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+        animate();
+    </script>
+</body>
+</html>
